@@ -19,5 +19,9 @@
         android:supportsRtl="true"
         tools:targetApi="33">
         <!-- Activities, services, receivers populated in Plan 3 -->
+        <service
+            android:name="eu.hyperhdr.android.service.HyperHdrCaptureService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
     </application>
 </manifest>
