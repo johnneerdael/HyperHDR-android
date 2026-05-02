@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: 'temurin', java-version: '17' }
+      - uses: gradle/gradle-build-action@v3
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > $RUNNER_TEMP/release.keystore
+
+      - name: Write keystore.properties
+        run: |
+          cat > tv/keystore.properties <<EOF
+          storeFile=$RUNNER_TEMP/release.keystore
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
+
+      - name: Assemble release APK
+        run: ./gradlew :tv:assembleRelease
+
+      - name: Compute checksum
+        id: sha
+        run: |
+          APK=$(ls tv/build/outputs/apk/release/*.apk | head -1)
+          echo "apk=$APK" >> $GITHUB_OUTPUT
+          echo "sha256=$(sha256sum "$APK" | awk '{print $1}')" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.sha.outputs.apk }}
+          body: |
+            HyperHDR-Android ${{ github.ref_name }}
+
+            **SHA256:** `${{ steps.sha.outputs.sha256 }}`
+
+            See `docs/superpowers/specs/2026-05-02-hyperhdr-android-grabber-design.md`.

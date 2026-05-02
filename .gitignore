@@ -10,3 +10,6 @@
 /captures
 .externalNativeBuild
 /tools/flatc-25.2.10/
+tv/keystore.properties
+*.keystore
+*.jks
