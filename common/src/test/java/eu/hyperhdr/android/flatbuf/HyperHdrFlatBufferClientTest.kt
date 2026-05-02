@@ -1,6 +1,8 @@
 package eu.hyperhdr.android.flatbuf
 
 import com.google.common.truth.Truth.assertThat
+import hyperhdrnet.Clear
+import hyperhdrnet.Color
 import hyperhdrnet.Command
 import hyperhdrnet.Image
 import hyperhdrnet.ImageType
@@ -84,6 +86,60 @@ class HyperHdrFlatBufferClientTest {
             assertThat(nv12.dataY(y.size - 1).toInt()).isEqualTo(8)
             assertThat(nv12.dataUv(0).toInt() and 0xFF).isEqualTo(100)
             assertThat(nv12.dataUv(uv.size - 1).toInt() and 0xFF).isEqualTo(103)
+
+            client.close()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `clear emits a Clear command with the requested priority`() = runTest {
+        FakeHyperHdrServer().use { server ->
+            val client = HyperHdrFlatBufferClient(host = "127.0.0.1", port = server.port)
+            client.connect()
+
+            // Drain the Register frame so the next read is the Clear frame.
+            withContext(Dispatchers.Default.limitedParallelism(1)) {
+                withTimeout(2_000) { server.receiveFrame() }
+            }
+
+            client.clear(priority = 100)
+
+            val frame = withContext(Dispatchers.Default.limitedParallelism(1)) {
+                withTimeout(2_000) { server.receiveFrame() }
+            }
+            val request = Request.getRootAsRequest(ByteBuffer.wrap(frame))
+            assertThat(request.commandType()).isEqualTo(Command.Clear)
+            val clear = hyperhdrnet.Clear().also { request.command(it) }
+            assertThat(clear.priority()).isEqualTo(100)
+
+            client.close()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `setColor emits a Color command with packed RGB and duration`() = runTest {
+        FakeHyperHdrServer().use { server ->
+            val client = HyperHdrFlatBufferClient(host = "127.0.0.1", port = server.port)
+            client.connect()
+
+            // Drain the Register frame so the next read is the Color frame.
+            withContext(Dispatchers.Default.limitedParallelism(1)) {
+                withTimeout(2_000) { server.receiveFrame() }
+            }
+
+            val rgb = (0xFF shl 16) or (0xA0 shl 8) or 0x10 // 0xFFA010
+            client.setColor(rgb, durationMs = 250)
+
+            val frame = withContext(Dispatchers.Default.limitedParallelism(1)) {
+                withTimeout(2_000) { server.receiveFrame() }
+            }
+            val request = Request.getRootAsRequest(ByteBuffer.wrap(frame))
+            assertThat(request.commandType()).isEqualTo(Command.Color)
+            val color = hyperhdrnet.Color().also { request.command(it) }
+            assertThat(color.data()).isEqualTo(rgb)
+            assertThat(color.duration()).isEqualTo(250)
 
             client.close()
         }
