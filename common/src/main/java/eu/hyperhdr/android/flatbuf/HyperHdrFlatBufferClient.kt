@@ -59,6 +59,9 @@ class HyperHdrFlatBufferClient(
     private var writerJob: Job? = null
     private var readerJob: Job? = null
 
+    /** Owned exclusively by the writer coroutine; safe to reuse without synchronization. */
+    private val builder = FlatBufferBuilder(64 * 1024)
+
     private fun startWriter() {
         writerJob = scope.launch {
             for (msg in outbox) writeOutbound(msg)
@@ -88,7 +91,7 @@ class HyperHdrFlatBufferClient(
 
     private fun writeOutbound(msg: Outbound) {
         val out = output ?: return
-        val builder = FlatBufferBuilder(64 * 1024)
+        builder.clear()
         val reqOff = when (msg) {
             is Outbound.Register -> {
                 val originOff = builder.createString(origin)
