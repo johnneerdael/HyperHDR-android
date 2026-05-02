@@ -46,6 +46,8 @@ class HyperHdrCaptureService : Service() {
     private var reconnector: HyperHdrFlatBufferReconnector? = null
     private var jsonClient: HyperHdrJsonApiClient? = null
     private var stateCollector: Job? = null
+    private var hdrDetector: eu.hyperhdr.android.hdr.HdrDetector? = null
+    private var hdrCollectorJob: Job? = null
 
     val stateFlow get() = sm.flow
     fun lastError(): String? = sm.lastErrorMessage
@@ -59,6 +61,7 @@ class HyperHdrCaptureService : Service() {
     override fun onCreate() {
         super.onCreate()
         profileStore = ProfileStore(EncryptedProfileStorage.create(this))
+        hdrDetector = eu.hyperhdr.android.hdr.HdrDetector(this).also { it.start() }
         ensureChannel()
         startForeground(NOTIF_ID, buildNotification(ServiceState.IDLE), foregroundType())
     }
@@ -110,6 +113,17 @@ class HyperHdrCaptureService : Service() {
             }
         }
 
+        val detector = hdrDetector
+        val client = jsonClient
+        if (detector != null && client != null) {
+            hdrCollectorJob = scope.launch {
+                detector.current.collect { type ->
+                    runCatching { client.setHdrVideoMode(type != eu.hyperhdr.android.hdr.HdrType.SDR) }
+                        // JSON-API failures don't break capture; spec §8.1.
+                }
+            }
+        }
+
         val dm = DisplayMetrics().also {
             (getSystemService(WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(it)
         }
@@ -133,12 +147,15 @@ class HyperHdrCaptureService : Service() {
         reconnector?.close(); reconnector = null
         jsonClient = null
         stateCollector?.cancel(); stateCollector = null
+        hdrCollectorJob?.cancel(); hdrCollectorJob = null
         sm.onToggleOff()
         updateNotif()
     }
 
     override fun onDestroy() {
         stopCapture()
+        hdrDetector?.stop(); hdrDetector = null
+        hdrCollectorJob?.cancel(); hdrCollectorJob = null
         scope.cancel()
         super.onDestroy()
     }
