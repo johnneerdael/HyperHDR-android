@@ -8,4 +8,5 @@ data class ServerProfile(
     val priority: Int = 100,
     val token: String? = null,
     val highQuality: Boolean = false,
+    val hdrAware: Boolean = false,
 )
