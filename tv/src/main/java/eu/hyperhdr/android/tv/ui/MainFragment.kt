@@ -130,5 +130,13 @@ class MainFragment : Fragment() {
                 ) + (s.lastErrorMessage?.let { "  ⚠  $it" } ?: "")
             }
         }
+        viewLifecycleOwner.lifecycleScope.launch {
+            binder?.serverHdrSignaled?.collect { hdr ->
+                val statsView = view?.findViewById<TextView>(R.id.tv_stats) ?: return@collect
+                val cur = statsView.text?.toString().orEmpty()
+                val withoutBadge = cur.removeSuffix("  ✦ HDR").removeSuffix("  ✦ HDR ")
+                statsView.text = if (hdr) "$withoutBadge  ✦ HDR" else withoutBadge
+            }
+        }
     }
 }
