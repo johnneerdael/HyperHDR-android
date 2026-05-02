@@ -1,4 +1,4 @@
-package com.hyperion.grabber.common.util;
+package eu.hyperhdr.android.util;
 
 import android.app.Activity;
 import android.app.AlertDialog;
