@@ -53,6 +53,12 @@ class HyperHdrCaptureService : Service() {
     val statsCollector = eu.hyperhdr.android.stats.LiveStatsCollector()
     private var sampleJob: Job? = null
 
+    var jsonEvents: eu.hyperhdr.android.json.HyperHdrJsonApiEvents? = null
+        private set
+    private var jsonEventsCollectorJob: Job? = null
+    private val _serverHdrSignaled = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val serverHdrSignaled: kotlinx.coroutines.flow.StateFlow<Boolean> = _serverHdrSignaled
+
     val stateFlow get() = sm.flow
     fun lastError(): String? = sm.lastErrorMessage
 
@@ -121,6 +127,23 @@ class HyperHdrCaptureService : Service() {
             }
         }
 
+        jsonEvents = eu.hyperhdr.android.json.HyperHdrJsonApiEvents(
+            host = profile.host, port = profile.jsonPort,
+        ).also { it.start(profile.token) }
+
+        jsonEventsCollectorJob = scope.launch {
+            jsonEvents?.flow?.collect { ev ->
+                when (ev) {
+                    is eu.hyperhdr.android.json.JsonEvent.VideoModeChanged ->
+                        _serverHdrSignaled.value = ev.hdr
+                    is eu.hyperhdr.android.json.JsonEvent.ComponentChanged -> {
+                        if (ev.name == "HDR") _serverHdrSignaled.value = ev.enabled
+                    }
+                    else -> { /* InstanceChanged, ServerInfoSnapshot — UI surfaces consume directly */ }
+                }
+            }
+        }
+
         val detector = hdrDetector
         val client = jsonClient
         if (detector != null && client != null) {
@@ -173,6 +196,9 @@ class HyperHdrCaptureService : Service() {
         stateCollector?.cancel(); stateCollector = null
         hdrCollectorJob?.cancel(); hdrCollectorJob = null
         sampleJob?.cancel(); sampleJob = null
+        jsonEventsCollectorJob?.cancel(); jsonEventsCollectorJob = null
+        jsonEvents?.close(); jsonEvents = null
+        _serverHdrSignaled.value = false
         sm.onToggleOff()
         updateNotif()
     }

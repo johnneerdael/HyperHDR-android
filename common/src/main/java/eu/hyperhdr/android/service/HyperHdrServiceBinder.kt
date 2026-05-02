@@ -15,4 +15,11 @@ class HyperHdrServiceBinder(private val service: HyperHdrCaptureService) : Binde
     suspend fun setHdrVideoMode(hdr: Boolean): Boolean = service.setHdrVideoMode(hdr)
 
     val stats: StateFlow<eu.hyperhdr.android.stats.LiveStats> get() = service.statsCollector.stats
+
+    /** Latest HDR-tonemap state reported by the server over the WebSocket. */
+    val serverHdrSignaled: kotlinx.coroutines.flow.StateFlow<Boolean> get() = service.serverHdrSignaled
+
+    /** Live stream of all WebSocket events from the server (since service start). */
+    val jsonEventsFlow: kotlinx.coroutines.flow.Flow<eu.hyperhdr.android.json.JsonEvent>
+        get() = service.jsonEvents?.flow ?: kotlinx.coroutines.flow.emptyFlow()
 }
