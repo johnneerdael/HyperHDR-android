@@ -33,4 +33,13 @@ class FrameClockTest {
         val results = (0 until 3).map { clock.shouldEmitForVsync(it.toLong()) }
         assertThat(results).containsExactly(true, true, true).inOrder()
     }
+
+    @Test
+    fun `60 fps target on 90 Hz display rounds to every-other-vsync`() {
+        // 90/60 = 1.5; nearest-rounding gives divisor=2, so we emit every other vsync.
+        // Truncation would give divisor=1 (emit every vsync = 90 fps actual). That's the bug.
+        val clock = FrameClock(targetFps = 60, displayHz = 90.0)
+        val results = (0 until 6).map { clock.shouldEmitForVsync(it.toLong()) }
+        assertThat(results).containsExactly(true, false, true, false, true, false).inOrder()
+    }
 }
