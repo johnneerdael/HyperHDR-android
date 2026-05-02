@@ -1,7 +1,7 @@
 package com.hyperion.grabber.common.network
 
 import com.google.flatbuffers.FlatBufferBuilder
-import hyperionnet.*
+import hyperhdrnet.*
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
