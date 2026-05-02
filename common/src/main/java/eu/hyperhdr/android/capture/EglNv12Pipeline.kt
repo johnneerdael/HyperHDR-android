@@ -151,7 +151,9 @@ class EglNv12Pipeline(
         val id = IntArray(1)
         GLES20.glGenTextures(1, id, 0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, id[0])
-        GLES30.glTexStorage2D(GLES20.GL_TEXTURE_2D, 1, internalFormat, w, h)
+        // Use glTexImage2D instead of glTexStorage2D for broader driver compatibility
+        // (some Android 9 / Mali drivers reject R8 / RG8 immutable storage as FBO attachments).
+        GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, null)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
