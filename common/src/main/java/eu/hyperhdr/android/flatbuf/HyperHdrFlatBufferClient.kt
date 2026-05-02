@@ -56,10 +56,32 @@ class HyperHdrFlatBufferClient(
 
     private val outbox = Channel<Outbound>(Channel.CONFLATED)
     private var writerJob: Job? = null
+    private var readerJob: Job? = null
 
     private fun startWriter() {
         writerJob = scope.launch {
             for (msg in outbox) writeOutbound(msg)
+        }
+    }
+
+    private fun startReader(sock: java.net.Socket) {
+        readerJob = scope.launch {
+            try {
+                val input = sock.getInputStream()
+                val buf = ByteArray(1024)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n == -1) {
+                        // Server closed the connection cleanly.
+                        throw java.io.EOFException("server closed")
+                    }
+                    // Ignore the bytes — Reply frames aren't consumed by v1.
+                }
+            } catch (_: java.io.IOException) {
+                _state.value = ConnectionState.ERROR
+                try { sock.close() } catch (_: Exception) {}
+                output = null
+            }
         }
     }
 
@@ -109,6 +131,9 @@ class HyperHdrFlatBufferClient(
                 socket = sock
                 val out = DataOutputStream(sock.getOutputStream())
                 output = out
+                // Reader coroutine: detects server-side close (EOF) or socket error.
+                // We don't process Reply frames here; their only job is to be a "still alive" signal.
+                startReader(sock)
                 // Send Register synchronously so callers can rely on "client is registered" once connect() returns.
                 writeOutbound(Outbound.Register)
                 // THEN start the async writer for subsequent frames.
@@ -156,6 +181,8 @@ class HyperHdrFlatBufferClient(
     }
 
     override fun close() {
+        readerJob?.cancel()
+        readerJob = null
         writerJob?.cancel()
         writerJob = null
         outbox.close()
