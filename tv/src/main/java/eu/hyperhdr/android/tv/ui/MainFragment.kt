@@ -72,6 +72,14 @@ class MainFragment : Fragment() {
             startActivity(Intent(requireContext(), SettingsActivity::class.java))
         }
         stats.text = "" // Plan 4 hooks live stats here.
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            val avail = eu.hyperhdr.android.tv.update.UpdateChecker()
+                .latest(eu.hyperhdr.android.tv.BuildConfig.VERSION_NAME)
+            if (avail != null) {
+                stats.text = (stats.text?.toString().orEmpty() + "  ⬆  v${avail.tag} available")
+            }
+        }
     }
 
     override fun onStart() {
