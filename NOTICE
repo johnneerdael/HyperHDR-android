@@ -1,0 +1,16 @@
+HyperHDR-Android Grabber
+Copyright (c) 2026 John Neerdael and contributors
+
+This product is a hard fork of "Hyperion Android Reborn"
+  Copyright (c) 2024 haumlab and contributors
+  https://github.com/haumlab/hyperion-android-reborn
+
+Which itself derives from "Hyperion Android Grabber"
+  Copyright (c) 2018 abrenoch and contributors
+  https://github.com/abrenoch/hyperion-android-grabber
+
+All upstream code is used under the terms of the MIT License (see LICENSE.txt).
+
+The HyperHDR project (https://github.com/awawa-dev/HyperHDR) is a separate
+project. This app is a third-party client; it is not maintained by the HyperHDR
+authors.

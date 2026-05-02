@@ -1,25 +1,17 @@
+# HyperHDR-Android
 
-<img width="1280" height="640" alt="Hyperion Grabber Reborn" src="https://github.com/user-attachments/assets/80f2cdb0-f79a-47b9-ac09-efedaf90931a" />
+Screen capture client for [HyperHDR](https://github.com/awawa-dev/HyperHDR), targeted at Android TV (API 28+).
 
+Status: **in development.** See `docs/superpowers/specs/2026-05-02-hyperhdr-android-grabber-design.md` for the spec and `docs/superpowers/plans/` for the implementation plans.
 
-# Hyperion Android Reborn
-Screen grabber for hyperion, updated for **Android 12** and **beyond**.
+## What it does
 
-This application will send the content of the android screen to a hyperion instance to handle the image.
+Streams the Android TV screen to a HyperHDR instance over the FlatBuffer wire protocol (NV12). HyperHDR drives the LEDs (Hyperk, HyperSerial, Adalight, etc.).
 
-Info about hyperion can be found on their website: 
-https://hyperion-project.org/
+## Acknowledgements
 
+Hard fork of [haumlab/hyperion-android-reborn](https://github.com/haumlab/hyperion-android-reborn). See `NOTICE`.
 
----
+## License
 
-# Important information for TCL tvs.
-For TCL televisions, the TCL watchdog will cause the app to close in the background, please run these steps to stop this from happening.
-Go to Settings > Apps > Hyperion Grabber
-Enable "Auto-start" or "Allow background activity" permission
-Some TCL TVs have this in Settings > Privacy > Special app access > Auto-start
-
----
-
-# Download
-Both **TV** and **Mobile** apps are within [releases page](https://github.com/haumlab/hyperion-android-reborn/releases)
+MIT — see `LICENSE.txt`.
