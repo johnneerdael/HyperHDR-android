@@ -1,7 +1,9 @@
 package eu.hyperhdr.android.json
 
 import com.google.common.truth.Truth.assertThat
+import eu.hyperhdr.android.flatbuf.BackoffSchedule
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -143,6 +145,37 @@ class HyperHdrJsonApiEventsTest {
         val event = deferred.await()
         assertThat(event).isInstanceOf(JsonEvent.VideoModeChanged::class.java)
         assertThat((event as JsonEvent.VideoModeChanged).hdr).isTrue()
+
+        events.close()
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `reconnects after server-side disconnect`() = runTest {
+        server.enqueue(MockResponse().withWebSocketUpgrade(serverListener))
+        server.enqueue(MockResponse().withWebSocketUpgrade(serverListener))  // second connection
+
+        val events = HyperHdrJsonApiEvents(
+            host = server.hostName, port = server.port,
+            backoff = BackoffSchedule(longArrayOf(50L), capMillis = 50L),
+        )
+        events.start(token = null)
+
+        // First subscribe — confirm client connected and sent its serverinfo subscribe request.
+        val first = withContext(Dispatchers.IO) { incomingMessages.poll(2, TimeUnit.SECONDS) }
+        assertThat(first).isNotNull()
+
+        // Wait for server-side socket and force-disconnect.
+        var attempts = 0
+        while (serverSocket == null && attempts++ < 50) Thread.sleep(20)
+        val sock = serverSocket!!
+        serverSocket = null  // cleared so onOpen of the next connection updates it
+        sock.close(1000, "test drop")
+
+        // Within backoff+connect time, client reconnects and re-subscribes.
+        val secondSubscribe = withContext(Dispatchers.IO) { incomingMessages.poll(5, TimeUnit.SECONDS) }
+        assertThat(secondSubscribe).isNotNull()
+        assertThat(secondSubscribe!!).contains("\"command\":\"serverinfo\"")
 
         events.close()
     }

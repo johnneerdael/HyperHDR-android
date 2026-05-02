@@ -1,8 +1,17 @@
 package eu.hyperhdr.android.json
 
+import eu.hyperhdr.android.flatbuf.BackoffSchedule
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -16,42 +25,73 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * WebSocket-backed live-events client for HyperHDR JSON-RPC. Opens the socket on [start],
- * subscribes to the server-side update streams we care about, and exposes parsed events via
- * [flow] as a [SharedFlow]. The HTTP one-shot client ([HyperHdrJsonApiClient]) is unaffected
- * — that one stays the default for register-time calls; this class is only opened when a UI
- * surface (settings page, main screen) wants live state.
- *
- * Reconnect on disconnect is added in Task 7. v0.3.0 baseline opens once and stops on close.
+ * subscribes, exposes parsed events via [flow], and reconnects on disconnect using
+ * [backoff]. Consumer just calls [start] once and [close] once; everything in between
+ * (including server-side drops, NAT timeouts, transient Wi-Fi blips) is invisible.
  */
 class HyperHdrJsonApiEvents(
     private val host: String,
     private val port: Int = 19444,
     private val httpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(2, TimeUnit.SECONDS)
-        // No read timeout: WebSocket is long-lived.
         .readTimeout(0, TimeUnit.SECONDS)
         .build(),
+    private val backoff: BackoffSchedule = BackoffSchedule.default(),
 ) : Closeable {
 
     private val tanCounter = AtomicInteger(1)
     private val _flow = MutableSharedFlow<JsonEvent>(replay = 0, extraBufferCapacity = 16)
     val flow: SharedFlow<JsonEvent> = _flow.asSharedFlow()
 
-    private var ws: WebSocket? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var loopJob: Job? = null
+    @Volatile private var ws: WebSocket? = null
 
     fun start(token: String?) {
-        val request = Request.Builder()
-            .url("ws://$host:$port/")
-            .build()
-        ws = httpClient.newWebSocket(request, object : WebSocketListener() {
+        if (loopJob?.isActive == true) return
+        loopJob = scope.launch {
+            while (true) {
+                val opened = openOnce(token)
+                if (opened) backoff.reset() else delay(backoff.nextDelayMillis())
+            }
+        }
+    }
+
+    /**
+     * Opens the socket and suspends until it closes (gracefully or by failure).
+     * Returns true if the socket made it to onOpen successfully (so backoff resets);
+     * false if it failed before opening (so backoff advances).
+     */
+    private suspend fun openOnce(token: String?): Boolean {
+        val request = Request.Builder().url("ws://$host:$port/").build()
+        val openedSignal = CompletableDeferred<Boolean>()
+        val closedSignal = CompletableDeferred<Unit>()
+        val listener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
+                openedSignal.complete(true)
                 webSocket.send(buildSubscribeRequest(token))
             }
             override fun onMessage(webSocket: WebSocket, text: String) {
                 parseEvent(text)?.let { _flow.tryEmit(it) }
             }
-            // No reconnect; consumer decides.
-        })
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                // Acknowledge the server-initiated close so onClosed fires immediately rather than
+                // after OkHttp's 60-second cancel-after-close timeout.
+                webSocket.close(1000, null)
+            }
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                closedSignal.complete(Unit)
+            }
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                if (!openedSignal.isCompleted) openedSignal.complete(false)
+                closedSignal.complete(Unit)
+            }
+        }
+        ws = httpClient.newWebSocket(request, listener)
+        val ok = openedSignal.await()
+        closedSignal.await()
+        ws = null
+        return ok
     }
 
     private fun buildSubscribeRequest(token: String?): String {
@@ -121,6 +161,8 @@ class HyperHdrJsonApiEvents(
     }
 
     override fun close() {
+        loopJob?.cancel()
+        scope.cancel()
         ws?.close(1000, "client closing")
         ws = null
     }
