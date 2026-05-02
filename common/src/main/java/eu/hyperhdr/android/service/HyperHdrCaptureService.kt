@@ -50,6 +50,12 @@ class HyperHdrCaptureService : Service() {
     val stateFlow get() = sm.flow
     fun lastError(): String? = sm.lastErrorMessage
 
+    /** Plan 4 hooks HDR detection here. Currently a stub that returns success when JSON client is up. */
+    suspend fun setHdrVideoMode(hdr: Boolean): Boolean = try {
+        jsonClient?.setHdrVideoMode(hdr)
+        true
+    } catch (_: Exception) { false }
+
     override fun onCreate() {
         super.onCreate()
         profileStore = ProfileStore(EncryptedProfileStorage.create(this))
@@ -115,6 +121,10 @@ class HyperHdrCaptureService : Service() {
             density = dm.densityDpi,
             config = cfg,
             sink = r,
+            onProjectionStopped = {
+                // Posted to the main thread because state machine + notifications are main-thread-only.
+                scope.launch { sm.onProjectionPaused(); updateNotif() }
+            },
         ).also { it.start() }
     }
 

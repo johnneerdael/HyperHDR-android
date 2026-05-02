@@ -1,7 +1,9 @@
 package eu.hyperhdr.android.tv.ui.wizard
 
 import android.app.Activity
+import android.content.Context
 import android.net.nsd.NsdManager
+import android.net.wifi.WifiManager
 import android.os.Bundle
 import androidx.leanback.app.GuidedStepSupportFragment
 import androidx.fragment.app.FragmentActivity
@@ -17,7 +19,10 @@ class WizardActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        discovery = HyperHdrMdnsDiscovery(getSystemService(NSD_SERVICE) as NsdManager).also { it.start() }
+        discovery = HyperHdrMdnsDiscovery(
+            getSystemService(NSD_SERVICE) as NsdManager,
+            getSystemService(Context.WIFI_SERVICE) as? WifiManager,
+        ).also { it.start() }
         profileStore = ProfileStore(EncryptedProfileStorage.create(this))
         if (savedInstanceState == null) {
             GuidedStepSupportFragment.addAsRoot(this, DiscoveryStepFragment(), android.R.id.content)

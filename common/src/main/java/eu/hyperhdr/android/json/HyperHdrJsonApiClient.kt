@@ -35,7 +35,7 @@ class HyperHdrJsonApiClient(
         val body = post(req)
         if (!body.optBoolean("success", false)) {
             val err = body.optString("error", "unknown")
-            return@withContext if (err.contains("authorization", ignoreCase = true)) {
+            return@withContext if (err.contains("No Authorization", ignoreCase = true)) {
                 ServerInfo(version = "", instances = emptyList(), authRequired = true)
             } else {
                 throw JsonApiError("serverinfo failed: $err", httpCode = 200)

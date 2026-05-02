@@ -15,6 +15,7 @@ class HyperHdrGpuEncoder(
     private val density: Int,
     private val config: CaptureConfig,
     private val sink: FrameSink,
+    private val onProjectionStopped: (() -> Unit)? = null,  // <-- NEW
 ) {
     companion object { private const val TAG = "HyperHdr.Capture" }
 
@@ -25,7 +26,10 @@ class HyperHdrGpuEncoder(
     private var virtualDisplay: VirtualDisplay? = null
 
     private val projectionCallback = object : MediaProjection.Callback() {
-        override fun onStop() { stop() }
+        override fun onStop() {
+            stop()
+            onProjectionStopped?.invoke()
+        }
     }
 
     fun start() {
