@@ -70,4 +70,58 @@ class HyperHdrJsonApiClientTest {
         assertThat(body.getString("subcommand")).isEqualTo("login")
         assertThat(body.getString("token")).isEqualTo("test-token-123")
     }
+
+    @Test
+    fun `switchInstance posts instance switchTo with id`() = runTest {
+        server.enqueue(MockResponse().setBody("""
+            {"success":true,"command":"instance-switchTo","tan":1}
+        """.trimIndent()))
+
+        val client = HyperHdrJsonApiClient(host = server.hostName, port = server.port)
+        client.switchInstance(2)
+
+        val body = JSONObject(server.takeRequest().body.readUtf8())
+        assertThat(body.getString("command")).isEqualTo("instance")
+        assertThat(body.getString("subcommand")).isEqualTo("switchTo")
+        assertThat(body.getInt("instance")).isEqualTo(2)
+    }
+
+    @Test
+    fun `setHdrVideoMode posts videomode with HDR=1`() = runTest {
+        server.enqueue(MockResponse().setBody("""
+            {"success":true,"command":"videomode","tan":1}
+        """.trimIndent()))
+
+        val client = HyperHdrJsonApiClient(host = server.hostName, port = server.port)
+        client.setHdrVideoMode(true)
+
+        val body = JSONObject(server.takeRequest().body.readUtf8())
+        assertThat(body.getString("command")).isEqualTo("videomode")
+        assertThat(body.getInt("HDR")).isEqualTo(1)
+    }
+
+    @Test
+    fun `setHdrVideoMode posts videomode with HDR=0 when sdr`() = runTest {
+        server.enqueue(MockResponse().setBody("""
+            {"success":true,"command":"videomode","tan":1}
+        """.trimIndent()))
+
+        val client = HyperHdrJsonApiClient(host = server.hostName, port = server.port)
+        client.setHdrVideoMode(false)
+
+        val body = JSONObject(server.takeRequest().body.readUtf8())
+        assertThat(body.getInt("HDR")).isEqualTo(0)
+    }
+
+    @Test
+    fun `failed call throws JsonApiError with the server message`() = runTest {
+        server.enqueue(MockResponse().setBody("""
+            {"success":false,"error":"unknown command","tan":1}
+        """.trimIndent()))
+
+        val client = HyperHdrJsonApiClient(host = server.hostName, port = server.port)
+        val ex = try { client.switchInstance(99); null } catch (e: JsonApiError) { e }
+        assertThat(ex).isNotNull()
+        assertThat(ex!!.message).contains("unknown command")
+    }
 }
