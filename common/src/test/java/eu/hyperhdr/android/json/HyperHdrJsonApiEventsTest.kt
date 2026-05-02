@@ -92,4 +92,58 @@ class HyperHdrJsonApiEventsTest {
 
         events.close()
     }
+
+    @Test
+    fun `parses instance-update push as InstanceChanged event`() = runTest {
+        server.enqueue(MockResponse().withWebSocketUpgrade(serverListener))
+        val events = HyperHdrJsonApiEvents(
+            host = server.hostName, port = server.port, httpClient = sharedClient,
+        )
+        events.start(token = null)
+
+        withContext(Dispatchers.IO) { incomingMessages.poll(2, TimeUnit.SECONDS) } // drain subscribe
+
+        val deferred = async(Dispatchers.IO) { events.flow.first() }
+        withContext(Dispatchers.IO) { Thread.sleep(100) }
+
+        val sock = withContext(Dispatchers.IO) { awaitServerSocket() }
+        sock.send("""
+            {"command":"instance-update","data":[
+                {"instance":0,"running":true,"friendly_name":"LED Frame"},
+                {"instance":1,"running":false,"friendly_name":"Bias Lights"}
+            ]}
+        """.trimIndent())
+
+        val event = deferred.await()
+        assertThat(event).isInstanceOf(JsonEvent.InstanceChanged::class.java)
+        val ic = event as JsonEvent.InstanceChanged
+        assertThat(ic.instances).hasSize(2)
+        assertThat(ic.instances[0]).isEqualTo(Instance(0, "LED Frame", true))
+        assertThat(ic.instances[1]).isEqualTo(Instance(1, "Bias Lights", false))
+
+        events.close()
+    }
+
+    @Test
+    fun `parses videomode-update HDR=1 as VideoModeChanged(true)`() = runTest {
+        server.enqueue(MockResponse().withWebSocketUpgrade(serverListener))
+        val events = HyperHdrJsonApiEvents(
+            host = server.hostName, port = server.port, httpClient = sharedClient,
+        )
+        events.start(token = null)
+
+        withContext(Dispatchers.IO) { incomingMessages.poll(2, TimeUnit.SECONDS) } // drain subscribe
+
+        val deferred = async(Dispatchers.IO) { events.flow.first() }
+        withContext(Dispatchers.IO) { Thread.sleep(100) }
+
+        val sock = withContext(Dispatchers.IO) { awaitServerSocket() }
+        sock.send("""{"command":"videomode-update","data":{"HDR":1}}""")
+
+        val event = deferred.await()
+        assertThat(event).isInstanceOf(JsonEvent.VideoModeChanged::class.java)
+        assertThat((event as JsonEvent.VideoModeChanged).hdr).isTrue()
+
+        events.close()
+    }
 }
