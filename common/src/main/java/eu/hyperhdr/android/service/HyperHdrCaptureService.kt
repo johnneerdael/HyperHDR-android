@@ -48,6 +48,8 @@ class HyperHdrCaptureService : Service() {
     private var stateCollector: Job? = null
     private var hdrDetector: eu.hyperhdr.android.hdr.HdrDetector? = null
     private var hdrCollectorJob: Job? = null
+    val statsCollector = eu.hyperhdr.android.stats.LiveStatsCollector()
+    private var sampleJob: Job? = null
 
     val stateFlow get() = sm.flow
     fun lastError(): String? = sm.lastErrorMessage
@@ -89,8 +91,12 @@ class HyperHdrCaptureService : Service() {
 
         val r = HyperHdrFlatBufferReconnector(
             host = profile.host, port = profile.flatbufPort, priority = profile.priority,
+            statsCollector = statsCollector,
         ).also { it.start() }
         reconnector = r
+        sampleJob = scope.launch {
+            while (true) { kotlinx.coroutines.delay(1000); statsCollector.sample() }
+        }
 
         stateCollector = scope.launch {
             r.state.collect { cs ->
@@ -148,6 +154,7 @@ class HyperHdrCaptureService : Service() {
         jsonClient = null
         stateCollector?.cancel(); stateCollector = null
         hdrCollectorJob?.cancel(); hdrCollectorJob = null
+        sampleJob?.cancel(); sampleJob = null
         sm.onToggleOff()
         updateNotif()
     }

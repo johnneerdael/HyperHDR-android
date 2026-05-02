@@ -101,6 +101,7 @@ class MainFragment : Fragment() {
 
     private fun observeState() {
         val toggle = view?.findViewById<Button>(R.id.btn_toggle) ?: return
+        val statsView = view?.findViewById<TextView>(R.id.tv_stats) ?: return
         viewLifecycleOwner.lifecycleScope.launch {
             binder?.state?.collect { s ->
                 toggle.text = when (s) {
@@ -110,6 +111,15 @@ class MainFragment : Fragment() {
                     ServiceState.PAUSED -> "Paused (waiting for screen)"
                     ServiceState.ERROR -> "Error — tap to retry"
                 }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            binder?.stats?.collect { s ->
+                statsView.text = if (s.width == 0) "" else String.format(
+                    java.util.Locale.US,
+                    "%.1f fps · %d KB/s · %dx%d",
+                    s.fps, s.bytesPerSec / 1024, s.width, s.height,
+                ) + (s.lastErrorMessage?.let { "  ⚠  $it" } ?: "")
             }
         }
     }

@@ -18,6 +18,7 @@ class HyperHdrFlatBufferReconnector(
     private val priority: Int = 100,
     private val origin: String = "HyperHDR-Android",
     private val backoff: BackoffSchedule = BackoffSchedule.default(),
+    private val statsCollector: eu.hyperhdr.android.stats.LiveStatsCollector? = null,
 ) : FrameSink, Closeable {
 
     private val _state = MutableStateFlow(ConnectionState.DISCONNECTED)
@@ -36,7 +37,7 @@ class HyperHdrFlatBufferReconnector(
     private suspend fun runLoop() {
         while (true) {
             _state.value = ConnectionState.CONNECTING
-            val client = HyperHdrFlatBufferClient(host, port, priority, origin)
+            val client = HyperHdrFlatBufferClient(host, port, priority, origin, statsCollector = statsCollector)
             try {
                 client.connect()
                 current = client

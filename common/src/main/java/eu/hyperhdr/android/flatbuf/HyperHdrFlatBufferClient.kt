@@ -33,6 +33,7 @@ class HyperHdrFlatBufferClient(
     private val priority: Int = 100,
     private val origin: String = "HyperHDR-Android",
     private val connectTimeoutMs: Int = 1_000,
+    private val statsCollector: eu.hyperhdr.android.stats.LiveStatsCollector? = null,
 ) : FrameSink, Closeable {
 
     private sealed interface Outbound {
@@ -114,7 +115,11 @@ class HyperHdrFlatBufferClient(
             }
         }
         Request.finishRequestBuffer(builder, reqOff)
+        val payloadSize = builder.dataBuffer().remaining()
         writeFrame(out, builder.dataBuffer())
+        if (msg is Outbound.Nv12) {
+            statsCollector?.onFrame(payloadSize, msg.width, msg.height)
+        }
     }
 
     suspend fun connect() {
