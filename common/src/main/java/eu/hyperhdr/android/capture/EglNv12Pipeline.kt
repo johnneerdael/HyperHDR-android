@@ -51,47 +51,77 @@ class EglNv12Pipeline(
 
     fun start(): Surface {
         runOnGl {
-            egl = EglCore()
-            pbuffer = egl.createPbufferSurface(1, 1)
-            egl.makeCurrent(pbuffer!!)
+            try {
+                egl = EglCore()
+                pbuffer = egl.createPbufferSurface(1, 1)
+                egl.makeCurrent(pbuffer!!)
 
-            when (config.tier) {
-                CaptureTier.SDR -> sdrDownscale = DownscaleProgram()
-                CaptureTier.HDR_AWARE -> hdrDownscale = HdrToneMapShader()
+                when (config.tier) {
+                    CaptureTier.SDR -> sdrDownscale = DownscaleProgram()
+                    CaptureTier.HDR_AWARE -> hdrDownscale = HdrToneMapShader()
+                }
+                pack = Nv12PackProgram()
+
+                oesTextureId = createTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES)
+                rgbaTextureId = createTexture2D(config.width, config.height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, GLES20.GL_RGBA)
+                yTextureId = createTexture2D(config.width, config.height, GLES30.GL_R8, GLES20.GL_UNSIGNED_BYTE, GLES30.GL_RED)
+                uvTextureId = createTexture2D(config.width / 2, config.height / 2, GLES30.GL_RG8, GLES20.GL_UNSIGNED_BYTE, GLES30.GL_RG)
+
+                rgbaFbo = createFbo(rgbaTextureId)
+                yFbo = createFbo(yTextureId)
+                uvFbo = createFbo(uvTextureId)
+
+                surfaceTexture = SurfaceTexture(oesTextureId)
+                // The source resolution is whatever the VirtualDisplay was created at — usually the
+                // physical display size. We don't constrain it here; the downscale shader handles it.
+                surfaceTexture.setOnFrameAvailableListener({ onFrameAvailable() }, handler)
+                surface = Surface(surfaceTexture)
+            } catch (t: Throwable) {
+                Log.w(TAG, "EglNv12Pipeline.start() failed mid-init, cleaning up", t)
+                releaseUnchecked()
+                throw t
             }
-            pack = Nv12PackProgram()
-
-            oesTextureId = createTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES)
-            rgbaTextureId = createTexture2D(config.width, config.height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, GLES20.GL_RGBA)
-            yTextureId = createTexture2D(config.width, config.height, GLES30.GL_R8, GLES20.GL_UNSIGNED_BYTE, GLES30.GL_RED)
-            uvTextureId = createTexture2D(config.width / 2, config.height / 2, GLES30.GL_RG8, GLES20.GL_UNSIGNED_BYTE, GLES30.GL_RG)
-
-            rgbaFbo = createFbo(rgbaTextureId)
-            yFbo = createFbo(yTextureId)
-            uvFbo = createFbo(uvTextureId)
-
-            surfaceTexture = SurfaceTexture(oesTextureId)
-            // The source resolution is whatever the VirtualDisplay was created at — usually the
-            // physical display size. We don't constrain it here; the downscale shader handles it.
-            surfaceTexture.setOnFrameAvailableListener({ onFrameAvailable() }, handler)
-            surface = Surface(surfaceTexture)
         }
         return surface
     }
 
     fun stop() {
-        runOnGl {
-            surface.release()
-            surfaceTexture.release()
-            GLES20.glDeleteFramebuffers(3, intArrayOf(rgbaFbo, yFbo, uvFbo), 0)
-            GLES20.glDeleteTextures(4, intArrayOf(oesTextureId, rgbaTextureId, yTextureId, uvTextureId), 0)
-            sdrDownscale?.release(); sdrDownscale = null
-            hdrDownscale?.release(); hdrDownscale = null
-            pack.release()
-            pbuffer?.let { egl.destroySurface(it) }
-            egl.release()
-        }
+        runOnGl { releaseUnchecked() }
         thread.quitSafely()
+    }
+
+    /**
+     * Best-effort cleanup of partially-initialized GL state. Safe to call when [start] threw mid-way.
+     * All operations are individually guarded; any sub-failure is logged and ignored. Must be
+     * invoked from the GL thread (typically via runOnGl { releaseUnchecked() }).
+     */
+    private fun releaseUnchecked() {
+        runCatching { if (::surface.isInitialized) surface.release() }
+        runCatching {
+            if (::surfaceTexture.isInitialized) {
+                surfaceTexture.setOnFrameAvailableListener(null)
+                surfaceTexture.detachFromGLContext()
+                surfaceTexture.release()
+            }
+        }
+        if (rgbaFbo != 0 || yFbo != 0 || uvFbo != 0) {
+            runCatching {
+                GLES20.glDeleteFramebuffers(3, intArrayOf(rgbaFbo, yFbo, uvFbo), 0)
+            }
+            rgbaFbo = 0; yFbo = 0; uvFbo = 0
+        }
+        if (oesTextureId != 0 || rgbaTextureId != 0 || yTextureId != 0 || uvTextureId != 0) {
+            runCatching {
+                GLES20.glDeleteTextures(4, intArrayOf(oesTextureId, rgbaTextureId, yTextureId, uvTextureId), 0)
+            }
+            oesTextureId = 0; rgbaTextureId = 0; yTextureId = 0; uvTextureId = 0
+        }
+        runCatching { sdrDownscale?.release() }; sdrDownscale = null
+        runCatching { hdrDownscale?.release() }; hdrDownscale = null
+        runCatching { if (::pack.isInitialized) pack.release() }
+        runCatching { pbuffer?.let { if (::egl.isInitialized) egl.destroySurface(it) } }
+        pbuffer = null
+        runCatching { if (::egl.isInitialized) egl.release() }
     }
 
     private fun onFrameAvailable() {
