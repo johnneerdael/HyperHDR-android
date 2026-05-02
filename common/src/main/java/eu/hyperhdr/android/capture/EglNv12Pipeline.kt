@@ -23,7 +23,8 @@ class EglNv12Pipeline(
 
     private lateinit var egl: EglCore
     private var pbuffer: android.opengl.EGLSurface? = null
-    private lateinit var downscale: DownscaleProgram
+    private var sdrDownscale: DownscaleProgram? = null
+    private var hdrDownscale: HdrToneMapShader? = null
     private lateinit var pack: Nv12PackProgram
 
     private var oesTextureId = 0
@@ -54,7 +55,10 @@ class EglNv12Pipeline(
             pbuffer = egl.createPbufferSurface(1, 1)
             egl.makeCurrent(pbuffer!!)
 
-            downscale = DownscaleProgram()
+            when (config.tier) {
+                CaptureTier.SDR -> sdrDownscale = DownscaleProgram()
+                CaptureTier.HDR_AWARE -> hdrDownscale = HdrToneMapShader()
+            }
             pack = Nv12PackProgram()
 
             oesTextureId = createTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES)
@@ -81,7 +85,8 @@ class EglNv12Pipeline(
             surfaceTexture.release()
             GLES20.glDeleteFramebuffers(3, intArrayOf(rgbaFbo, yFbo, uvFbo), 0)
             GLES20.glDeleteTextures(4, intArrayOf(oesTextureId, rgbaTextureId, yTextureId, uvTextureId), 0)
-            downscale.release()
+            sdrDownscale?.release(); sdrDownscale = null
+            hdrDownscale?.release(); hdrDownscale = null
             pack.release()
             pbuffer?.let { egl.destroySurface(it) }
             egl.release()
@@ -106,7 +111,11 @@ class EglNv12Pipeline(
             // Pass 1: OES → RGBA at target size
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, rgbaFbo)
             GLES20.glViewport(0, 0, config.width, config.height)
-            downscale.draw(oesTextureId, texTransform)
+            if (config.tier == CaptureTier.SDR) {
+                sdrDownscale!!.draw(oesTextureId, texTransform)
+            } else {
+                hdrDownscale!!.draw(oesTextureId, texTransform)
+            }
 
             // Pass 2: RGBA → Y at target size
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, yFbo)
