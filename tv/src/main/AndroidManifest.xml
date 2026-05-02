@@ -27,5 +27,20 @@
             android:name="eu.hyperhdr.android.tv.ui.wizard.WizardActivity"
             android:exported="false"
             android:theme="@style/Theme.Leanback.GuidedStep"/>
+
+        <activity
+            android:name="eu.hyperhdr.android.tv.ui.MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Leanback">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="eu.hyperhdr.android.tv.ui.settings.SettingsActivity"
+            android:exported="false"
+            android:theme="@style/PreferenceTheme.Leanback"/>
     </application>
 </manifest>

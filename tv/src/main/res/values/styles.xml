@@ -44,4 +44,6 @@
         <item name="guidanceIconStyle">@style/Widget.HyperionGrabber.FirstStepGuidanceIconStyle</item>
     </style>
 
+    <style name="PreferenceTheme.Leanback" parent="@style/Theme.Leanback"/>
+
 </resources>
