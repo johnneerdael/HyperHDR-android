@@ -3,6 +3,8 @@ package eu.hyperhdr.android.tv.ui.settings
 import android.content.Intent
 import android.os.Bundle
 import androidx.leanback.preference.LeanbackPreferenceFragment
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.launch
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
@@ -79,6 +81,7 @@ class SettingsFragment : LeanbackPreferenceFragment() {
         screen.addPreference(conn)
 
         val reconfigure = Preference(ctx).apply {
+            key = "server_card"
             title = "Reconfigure server…"
             summary = profile?.let { "${it.host}:${it.flatbufPort}" } ?: "Not configured"
             setOnPreferenceClickListener {
@@ -128,5 +131,55 @@ class SettingsFragment : LeanbackPreferenceFragment() {
         diag.addPreference(export)
 
         preferenceScreen = screen
+    }
+
+    private var binder: eu.hyperhdr.android.service.HyperHdrServiceBinder? = null
+    private val serviceConn = object : android.content.ServiceConnection {
+        override fun onServiceConnected(name: android.content.ComponentName?, service: android.os.IBinder?) {
+            binder = service as? eu.hyperhdr.android.service.HyperHdrServiceBinder
+            startEventCollector()
+        }
+        override fun onServiceDisconnected(name: android.content.ComponentName?) { binder = null }
+    }
+    private val uiScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob()
+    )
+    private var eventCollectorJob: kotlinx.coroutines.Job? = null
+
+    override fun onResume() {
+        super.onResume()
+        val ctx = activity ?: return
+        ctx.bindService(
+            android.content.Intent(ctx, eu.hyperhdr.android.service.HyperHdrCaptureService::class.java),
+            serviceConn, android.content.Context.BIND_AUTO_CREATE,
+        )
+    }
+
+    override fun onPause() {
+        eventCollectorJob?.cancel(); eventCollectorJob = null
+        uiScope.coroutineContext.cancelChildren()
+        runCatching { activity?.unbindService(serviceConn) }
+        binder = null
+        super.onPause()
+    }
+
+    private fun startEventCollector() {
+        val b = binder ?: return
+        eventCollectorJob = uiScope.launch {
+            b.jsonEventsFlow.collect { ev ->
+                if (ev is eu.hyperhdr.android.json.JsonEvent.InstanceChanged) {
+                    val ctx = activity ?: return@collect
+                    val store = eu.hyperhdr.android.settings.ProfileStore(
+                        eu.hyperhdr.android.settings.EncryptedProfileStorage.create(ctx)
+                    )
+                    val profile = store.load() ?: return@collect
+                    val current = ev.instances.firstOrNull { it.id == profile.instanceId }
+                    val pref = findPreference<androidx.preference.Preference>("server_card")
+                        ?: return@collect
+                    pref.summary = current?.let { "${profile.host} → ${it.name}" }
+                        ?: "${profile.host}:${profile.flatbufPort}"
+                }
+            }
+        }
     }
 }
