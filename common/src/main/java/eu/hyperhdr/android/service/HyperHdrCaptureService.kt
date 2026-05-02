@@ -16,6 +16,7 @@ import android.util.DisplayMetrics
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import eu.hyperhdr.android.capture.CaptureConfig
+import eu.hyperhdr.android.capture.CpuRgbFallbackEncoder
 import eu.hyperhdr.android.capture.HyperHdrGpuEncoder
 import eu.hyperhdr.android.flatbuf.ConnectionState
 import eu.hyperhdr.android.flatbuf.HyperHdrFlatBufferReconnector
@@ -43,6 +44,7 @@ class HyperHdrCaptureService : Service() {
     private lateinit var profileStore: ProfileStore
 
     private var encoder: HyperHdrGpuEncoder? = null
+    private var cpuFallback: CpuRgbFallbackEncoder? = null
     private var reconnector: HyperHdrFlatBufferReconnector? = null
     private var jsonClient: HyperHdrJsonApiClient? = null
     private var stateCollector: Job? = null
@@ -134,21 +136,37 @@ class HyperHdrCaptureService : Service() {
             (getSystemService(WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(it)
         }
         val cfg = if (profile.highQuality) CaptureConfig.HIGH else CaptureConfig.STANDARD
-        encoder = HyperHdrGpuEncoder(
-            mediaProjection = projection,
-            sourceWidth = dm.widthPixels,
-            sourceHeight = dm.heightPixels,
-            density = dm.densityDpi,
-            config = cfg,
-            sink = r,
-            onProjectionStopped = {
-                // Posted to the main thread because state machine + notifications are main-thread-only.
-                scope.launch { sm.onProjectionPaused(); updateNotif() }
-            },
-        ).also { it.start() }
+        encoder = try {
+            HyperHdrGpuEncoder(
+                mediaProjection = projection,
+                sourceWidth = dm.widthPixels,
+                sourceHeight = dm.heightPixels,
+                density = dm.densityDpi,
+                config = cfg,
+                sink = r,
+                onProjectionStopped = {
+                    scope.launch { sm.onProjectionPaused(); updateNotif() }
+                },
+            ).also { it.start() }
+        } catch (t: Throwable) {
+            sm.onError("GPU pipeline unavailable, using CPU fallback")
+            updateNotif()
+            null
+        }
+        if (encoder == null) {
+            cpuFallback = CpuRgbFallbackEncoder(
+                mediaProjection = projection,
+                sourceWidth = dm.widthPixels,
+                sourceHeight = dm.heightPixels,
+                density = dm.densityDpi,
+                config = cfg,
+                sink = r,
+            ).also { it.start() }
+        }
     }
 
     fun stopCapture() {
+        cpuFallback?.stop(); cpuFallback = null
         encoder?.stop(); encoder = null
         reconnector?.close(); reconnector = null
         jsonClient = null
