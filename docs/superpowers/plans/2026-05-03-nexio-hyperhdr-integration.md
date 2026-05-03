@@ -1442,6 +1442,8 @@ decision that follows from it."
 
 ## Task 9: Production capture — `HyperHdrCaptureShaderProgram` + downscale + PBO async readback
 
+> **API note (lesson from Task 7):** Nexio's media3 fork does NOT provide `GlUtil.createProgram(vertexSrc, fragmentSrc)`. Instead, use `androidx.media3.common.util.GlProgram(vertexSrc, fragmentSrc)` and configure attributes via `setBufferAttribute(...)` + `bindAttributesAndUniforms()`, following the `AlphaScaleShaderProgram` pattern in the fork. The Task 7 spike committed code uses this approach — read it before writing Task 9 to mirror the same idiom. The shader-source strings in `PqDownscaleShaders.kt` below are unchanged; only the GL-program-construction call site changes.
+
 **Files:**
 - Delete: `nexio/app/src/main/java/com/nexio/tv/integrations/hyperhdr/capture/HyperHdrLoggingShaderProgram.kt`
 - Delete: `nexio/app/src/main/java/com/nexio/tv/integrations/hyperhdr/capture/HyperHdrLoggingEffect.kt`
