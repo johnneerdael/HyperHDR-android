@@ -108,6 +108,25 @@ fun SettingsScreen(stubBinder: ScreenBinder? = null) {
                 onChange = { /* settings-flag-only in v1.0; service uses HdrDetector either way */ },
             )
         }
+        item {
+            // Probe runs once per Compose lifecycle; results are cached.
+            val p010Capable = remember { eu.hyperhdr.android.capture.Egl16BitCapabilityProbe.supportsR16UiFboStandalone() }
+            val canEnable = (profile?.hdrAware == true) && p010Capable
+            val summary = when {
+                !p010Capable -> "Your display driver doesn't support 10-bit render targets"
+                profile?.hdrAware != true -> "Enable HDR-aware capture above first"
+                else -> "EXPERIMENTAL — requires HyperHDR with the P010 patch (johnneerdael/HyperHDR-10bit fork or merged upstream)"
+            }
+            SwitchPreference(
+                title = "10-bit HDR transport (experimental)",
+                summary = summary,
+                enabled = canEnable,
+                checked = profile?.hdrNative == true,
+                onChange = { v ->
+                    profile?.let { store.save(it.copy(hdrNative = v)); profile = store.load() }
+                },
+            )
+        }
 
         item { CategoryHeader("Connection") }
         item {
