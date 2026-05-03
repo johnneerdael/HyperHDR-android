@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Internal cache dir, where UpdateInstaller drops the downloaded APK
+         before dispatching the package-install intent. -->
+    <cache-path name="updates" path="updates/" />
+</paths>

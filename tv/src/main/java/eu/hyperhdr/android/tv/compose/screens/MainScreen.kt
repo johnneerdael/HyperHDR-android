@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,12 +38,15 @@ import eu.hyperhdr.android.settings.ProfileStore
 import eu.hyperhdr.android.stats.LiveStats
 import eu.hyperhdr.android.tv.BuildConfig
 import eu.hyperhdr.android.tv.compose.service.rememberServiceBinder
+import eu.hyperhdr.android.tv.compose.widgets.AvailableUpgrade
 import eu.hyperhdr.android.tv.compose.widgets.ConnectionCard
 import eu.hyperhdr.android.tv.compose.widgets.StatsFooter
 import eu.hyperhdr.android.tv.update.UpdateChecker
+import eu.hyperhdr.android.tv.update.UpdateInstaller
 import eu.hyperhdr.android.tv.ui.settings.SettingsActivity
 import eu.hyperhdr.android.tv.ui.wizard.WizardActivity
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -59,11 +63,15 @@ fun MainScreen(stubBinder: ScreenBinder? = null) {
 
     val profile = remember { ProfileStore(EncryptedProfileStorage.create(ctx)).load() }
 
-    var updateAvailable by remember { mutableStateOf<String?>(null) }
+    var updateAvailable by remember { mutableStateOf<AvailableUpgrade?>(null) }
     LaunchedEffect(Unit) {
         runCatching { UpdateChecker().latest(BuildConfig.VERSION_NAME) }
-            .getOrNull()?.let { updateAvailable = it.tag }
+            .getOrNull()?.let { updateAvailable = AvailableUpgrade(tag = it.tag, downloadUrl = it.downloadUrl) }
     }
+
+    val installer = remember { UpdateInstaller(ctx.applicationContext) }
+    val updateState by installer.state.collectAsStateWithLifecycle()
+    val coroutineScope = rememberCoroutineScope()
 
     val projectionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -125,6 +133,20 @@ fun MainScreen(stubBinder: ScreenBinder? = null) {
         }
 
         Spacer(Modifier.height(32.dp))
-        StatsFooter(stats = stats, hdrBadge = serverHdr, updateAvailable = updateAvailable)
+        StatsFooter(
+            stats = stats,
+            hdrBadge = serverHdr,
+            updateAvailable = updateAvailable,
+            updateState = updateState,
+            onUpgradeClick = {
+                val upgrade = updateAvailable ?: return@StatsFooter
+                val url = upgrade.downloadUrl ?: return@StatsFooter
+                if (!installer.canInstall()) {
+                    ctx.startActivity(installer.unknownSourcesSettingsIntent())
+                    return@StatsFooter
+                }
+                coroutineScope.launch { installer.start(url, upgrade.tag) }
+            },
+        )
     }
 }
