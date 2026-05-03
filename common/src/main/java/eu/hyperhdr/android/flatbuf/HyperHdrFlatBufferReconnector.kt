@@ -69,6 +69,13 @@ class HyperHdrFlatBufferReconnector(
         current?.sendNv12(yPlane, uvPlane, width, height, strideY, strideUv)
     }
 
+    override fun sendP010(
+        yPlane: ByteArray, uvPlane: ByteArray,
+        width: Int, height: Int, strideY: Int, strideUv: Int,
+    ) {
+        current?.sendP010(yPlane, uvPlane, width, height, strideY, strideUv)
+    }
+
     fun clear(priority: Int = -1) { current?.clear(priority) }
     fun setColor(rgb: Int, durationMs: Int = -1) { current?.setColor(rgb, durationMs) }
 
