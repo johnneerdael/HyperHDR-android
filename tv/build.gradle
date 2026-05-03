@@ -21,6 +21,7 @@ android {
         targetSdk 34
         versionCode 4
         versionName "1.0.0-dev"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -78,6 +79,8 @@ dependencies {
 
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
     androidTestImplementation composeBom
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
 
     implementation "androidx.leanback:leanback:1.0.0"
