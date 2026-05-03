@@ -20,7 +20,7 @@ android {
         minSdk 28
         targetSdk 34
         versionCode 5
-        versionName "1.1.0-dev"
+        versionName "1.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -82,6 +82,7 @@ dependencies {
     androidTestImplementation composeBom
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test:runner:1.5.2'
+    testImplementation 'junit:junit:4.13.2'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
 
     implementation 'nl.dionsegijn:konfetti-xml:2.0.4'
