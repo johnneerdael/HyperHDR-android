@@ -56,6 +56,24 @@ object Egl16BitCapabilityProbe {
         labelPrefix = "GL_R16UI/GL_RG16UI",
     )
 
+    /**
+     * Convenience wrapper: brings up a temporary 1×1 EGL context, runs [supportsR16UiFbo] on
+     * it, tears down. Suitable for calling from non-GL threads (service / Compose UI).
+     * Result is cached after the first call (via the underlying [supportsR16UiFbo] cache).
+     */
+    fun supportsR16UiFboStandalone(): Boolean {
+        cachedInteger?.let { return it }
+        val core = EglCore()
+        val pbuffer = core.createPbufferSurface(1, 1)
+        try {
+            core.makeCurrent(pbuffer)
+            return supportsR16UiFbo()
+        } finally {
+            core.destroySurface(pbuffer)
+            core.release()
+        }
+    }
+
     /** Forces the next probe call to re-probe instead of returning the cached result. */
     fun reset() {
         cachedNormalized = null

@@ -16,7 +16,9 @@ import android.util.DisplayMetrics
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import eu.hyperhdr.android.capture.CaptureConfig
+import eu.hyperhdr.android.capture.CaptureTier
 import eu.hyperhdr.android.capture.CpuRgbFallbackEncoder
+import eu.hyperhdr.android.capture.Egl16BitCapabilityProbe
 import eu.hyperhdr.android.capture.HyperHdrGpuEncoder
 import eu.hyperhdr.android.flatbuf.ConnectionState
 import eu.hyperhdr.android.flatbuf.HyperHdrFlatBufferReconnector
@@ -158,7 +160,16 @@ class HyperHdrCaptureService : Service() {
         val dm = DisplayMetrics().also {
             (getSystemService(WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(it)
         }
-        val cfg = if (profile.highQuality) CaptureConfig.HIGH else CaptureConfig.STANDARD
+        // Tier selection: HDR_NATIVE only when (a) user opted in, (b) capability probe passed,
+        // (c) hdrAware is also on. Falls back to HDR_AWARE / SDR otherwise.
+        val tier = when {
+            profile.hdrNative && profile.hdrAware && Egl16BitCapabilityProbe.supportsR16UiFboStandalone() ->
+                CaptureTier.HDR_NATIVE
+            profile.hdrAware -> CaptureTier.HDR_AWARE
+            else -> CaptureTier.SDR
+        }
+        val baseSize = if (profile.highQuality) CaptureConfig.HIGH else CaptureConfig.STANDARD
+        val cfg = baseSize.copy(tier = tier)
         encoder = try {
             HyperHdrGpuEncoder(
                 mediaProjection = projection,
