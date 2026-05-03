@@ -75,7 +75,13 @@ class HyperHdrCaptureService : Service() {
         profileStore = ProfileStore(EncryptedProfileStorage.create(this))
         hdrDetector = eu.hyperhdr.android.hdr.HdrDetector(this).also { it.start() }
         ensureChannel()
-        startForeground(NOTIF_ID, buildNotification(ServiceState.IDLE), foregroundType())
+        val notif = buildNotification(ServiceState.IDLE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIF_ID, notif, foregroundType())
+        } else {
+            @Suppress("DEPRECATION")
+            startForeground(NOTIF_ID, notif)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder = HyperHdrServiceBinder(this)
