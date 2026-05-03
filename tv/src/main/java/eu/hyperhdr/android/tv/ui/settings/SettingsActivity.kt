@@ -1,16 +1,16 @@
 package eu.hyperhdr.android.tv.ui.settings
 
-import android.app.Activity
 import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import eu.hyperhdr.android.tv.compose.screens.SettingsScreen
+import eu.hyperhdr.android.tv.compose.theme.HyperHdrTheme
 
-class SettingsActivity : Activity() {
+class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) {
-            @Suppress("DEPRECATION")
-            fragmentManager.beginTransaction()
-                .replace(android.R.id.content, SettingsFragment())
-                .commit()
+        setContent {
+            HyperHdrTheme { SettingsScreen() }
         }
     }
 }

@@ -61,7 +61,6 @@
 
         <activity
             android:name="eu.hyperhdr.android.tv.ui.settings.SettingsActivity"
-            android:exported="false"
-            android:theme="@style/PreferenceTheme.Leanback"/>
+            android:exported="false"/>
     </application>
 </manifest>
