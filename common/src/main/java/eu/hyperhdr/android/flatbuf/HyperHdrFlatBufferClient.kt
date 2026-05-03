@@ -194,14 +194,18 @@ class HyperHdrFlatBufferClient(
         yPlane: ByteArray, uvPlane: ByteArray,
         width: Int, height: Int, strideY: Int, strideUv: Int,
     ) {
-        outbox.trySend(Outbound.Nv12(yPlane, uvPlane, width, height, strideY, strideUv))
+        // Defensive copy: the GL pipeline reuses its yBytes/uvBytes arrays every
+        // frame, so callers may overwrite them as soon as we return. The conflated
+        // outbox plus the writer coroutine's later FlatBuffer build mean a
+        // retained reference would race against the next glReadPixels.
+        outbox.trySend(Outbound.Nv12(yPlane.copyOf(), uvPlane.copyOf(), width, height, strideY, strideUv))
     }
 
     override fun sendP010(
         yPlane: ByteArray, uvPlane: ByteArray,
         width: Int, height: Int, strideY: Int, strideUv: Int,
     ) {
-        outbox.trySend(Outbound.P010(yPlane, uvPlane, width, height, strideY, strideUv))
+        outbox.trySend(Outbound.P010(yPlane.copyOf(), uvPlane.copyOf(), width, height, strideY, strideUv))
     }
 
     fun clear(priority: Int = -1) {

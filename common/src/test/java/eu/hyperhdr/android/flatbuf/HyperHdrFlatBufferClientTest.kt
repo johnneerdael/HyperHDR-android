@@ -147,6 +147,55 @@ class HyperHdrFlatBufferClientTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun `sendNv12 isolates caller buffer from queued payload`() = runTest {
+        FakeHyperHdrServer().use { server ->
+            val client = HyperHdrFlatBufferClient(
+                host = "127.0.0.1",
+                port = server.port,
+                priority = 100,
+            )
+            client.connect()
+
+            // Drain the Register frame so the next read is the Image frame.
+            withContext(Dispatchers.Default.limitedParallelism(1)) {
+                withTimeout(2_000) { server.receiveFrame() }
+            }
+
+            val w = 4
+            val h = 2
+            val y = ByteArray(w * h) { (it + 1).toByte() }       // 1..8
+            val uv = ByteArray(w * (h / 2)) { (it + 100).toByte() } // 100..103
+
+            client.sendNv12(y, uv, w, h, strideY = w, strideUv = w)
+
+            // Caller mutates its buffers immediately after send. If the client
+            // retained a reference (no defensive copy), the queued payload would
+            // be corrupted by the time the writer coroutine builds the FlatBuffer.
+            for (i in y.indices) y[i] = 0
+            for (i in uv.indices) uv[i] = 0
+
+            val frame = withContext(Dispatchers.Default.limitedParallelism(1)) {
+                withTimeout(2_000) { server.receiveFrame() }
+            }
+            val request = Request.getRootAsRequest(ByteBuffer.wrap(frame))
+            val image = Image().also { request.command(it) }
+            val nv12 = NV12Image().also { image.data(it) }
+
+            // Assert the wire payload reflects the ORIGINAL caller bytes, not
+            // the post-mutation zeros.
+            for (i in 0 until nv12.dataYLength()) {
+                assertThat(nv12.dataY(i).toInt() and 0xFF).isEqualTo(i + 1)
+            }
+            for (i in 0 until nv12.dataUvLength()) {
+                assertThat(nv12.dataUv(i).toInt() and 0xFF).isEqualTo(i + 100)
+            }
+
+            client.close()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun `sendP010 emits an Image frame with P010 payload and correct strides`() = runTest {
         FakeHyperHdrServer().use { server ->
             val client = HyperHdrFlatBufferClient(
