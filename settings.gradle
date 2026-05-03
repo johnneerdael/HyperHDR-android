@@ -1,1 +1,1 @@
-include ':common', ':tv'
+include ':common', ':tv', ':probe'
