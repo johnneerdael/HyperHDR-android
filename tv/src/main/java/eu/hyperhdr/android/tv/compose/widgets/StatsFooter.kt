@@ -71,5 +71,5 @@ fun StatsFooter(
     }
 }
 
-/** Tag + downloadUrl pair surfaced from the GitHub releases endpoint. */
-data class AvailableUpgrade(val tag: String, val downloadUrl: String?)
+/** Tag, downloadUrl, and (optional) expected APK byte size from the GitHub releases endpoint. */
+data class AvailableUpgrade(val tag: String, val downloadUrl: String?, val sizeBytes: Long?)

@@ -61,13 +61,13 @@ class UpdateInstaller(private val appContext: Context) {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
             appContext.packageManager.canRequestPackageInstalls()
 
-    suspend fun start(downloadUrl: String, version: String) {
+    suspend fun start(downloadUrl: String, version: String, expectedSizeBytes: Long? = null) {
         _state.value = State.Idle
         if (!canInstall()) {
             _state.value = State.NeedsPermission
             return
         }
-        val apk = runCatching { download(downloadUrl, version) }
+        val apk = runCatching { download(downloadUrl, version, expectedSizeBytes) }
             .onFailure {
                 Log.w(TAG, "APK download failed", it)
                 _state.value = State.Failed(it.message ?: "Download failed")
@@ -81,17 +81,21 @@ class UpdateInstaller(private val appContext: Context) {
             .onSuccess { _state.value = State.Dispatched }
     }
 
-    private suspend fun download(url: String, version: String): File = withContext(Dispatchers.IO) {
+    private suspend fun download(url: String, version: String, expectedSize: Long?): File = withContext(Dispatchers.IO) {
         val dir = File(appContext.cacheDir, "updates").apply { mkdirs() }
         // Wipe stale APKs from prior attempts so the cache doesn't accumulate.
         dir.listFiles()?.forEach { it.delete() }
         val target = File(dir, "hyperhdr-$version.apk")
 
-        val req = Request.Builder().url(url).build()
+        val req = Request.Builder()
+            .url(url)
+            .header("User-Agent", "HyperHDR-Android-Updater")
+            .build()
         httpClient.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) error("HTTP ${resp.code}")
             val body = resp.body ?: error("Empty response body")
-            val total = body.contentLength().takeIf { it > 0 } ?: -1L
+            // Prefer the GitHub-API-reported size when we have it, fall back to Content-Length.
+            val totalForProgress = expectedSize ?: body.contentLength().takeIf { it > 0 } ?: -1L
             body.byteStream().use { input ->
                 target.outputStream().use { output ->
                     val buf = ByteArray(64 * 1024)
@@ -101,8 +105,8 @@ class UpdateInstaller(private val appContext: Context) {
                     while (input.read(buf).also { read = it } != -1) {
                         output.write(buf, 0, read)
                         written += read
-                        if (total > 0) {
-                            val percent = ((written * 100) / total).toInt().coerceIn(0, 100)
+                        if (totalForProgress > 0) {
+                            val percent = ((written * 100) / totalForProgress).toInt().coerceIn(0, 100)
                             if (percent != lastReportedPercent) {
                                 _state.value = State.Downloading(percent)
                                 lastReportedPercent = percent
@@ -112,6 +116,32 @@ class UpdateInstaller(private val appContext: Context) {
                 }
             }
         }
+
+        // Integrity check 1: byte count matches the API-reported asset size when available.
+        // Catches truncation from CDN redirects, network drops, or mid-stream errors that
+        // OkHttp didn't surface as exceptions.
+        if (expectedSize != null && target.length() != expectedSize) {
+            val actual = target.length()
+            target.delete()
+            error("Downloaded APK is truncated: $actual bytes vs expected $expectedSize")
+        }
+
+        // Integrity check 2: file starts with the ZIP local-file-header magic. APKs are
+        // ZIPs, so anything else (HTML error page, empty response, partial file) fails here
+        // before we hand it to PackageInstaller, which would otherwise show the user a
+        // generic "App not installed" message with no actionable diagnostic.
+        target.inputStream().use { input ->
+            val magic = ByteArray(4)
+            val read = input.read(magic)
+            val isZip = read == 4 &&
+                magic[0] == 0x50.toByte() && magic[1] == 0x4B.toByte() &&
+                magic[2] == 0x03.toByte() && magic[3] == 0x04.toByte()
+            if (!isZip) {
+                target.delete()
+                error("Downloaded file is not a valid APK (ZIP magic missing)")
+            }
+        }
+
         target
     }
 

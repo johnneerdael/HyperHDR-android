@@ -70,7 +70,9 @@ fun MainScreen(stubBinder: ScreenBinder? = null) {
     var updateAvailable by remember { mutableStateOf<AvailableUpgrade?>(null) }
     LaunchedEffect(Unit) {
         runCatching { UpdateChecker().latest(BuildConfig.VERSION_NAME) }
-            .getOrNull()?.let { updateAvailable = AvailableUpgrade(tag = it.tag, downloadUrl = it.downloadUrl) }
+            .getOrNull()?.let {
+                updateAvailable = AvailableUpgrade(tag = it.tag, downloadUrl = it.downloadUrl, sizeBytes = it.sizeBytes)
+            }
     }
 
     val installer = remember { UpdateInstaller(ctx.applicationContext) }
@@ -163,7 +165,7 @@ fun MainScreen(stubBinder: ScreenBinder? = null) {
                     ctx.startActivity(installer.unknownSourcesSettingsIntent())
                     return@StatsFooter
                 }
-                coroutineScope.launch { installer.start(url, upgrade.tag) }
+                coroutineScope.launch { installer.start(url, upgrade.tag, upgrade.sizeBytes) }
             },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
