@@ -29,4 +29,14 @@ class ProfileStoreTest {
         store.clear()
         assertThat(store.load()).isNull()
     }
+
+    @Test
+    fun `hdrNative round-trips through save and load`() {
+        val store = ProfileStore(InMemoryStorage())
+        val original = ServerProfile(
+            host = "192.168.1.10", hdrAware = true, hdrNative = true,
+        )
+        store.save(original)
+        assertThat(store.load()).isEqualTo(original)
+    }
 }

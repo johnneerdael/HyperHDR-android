@@ -9,4 +9,5 @@ data class ServerProfile(
     val token: String? = null,
     val highQuality: Boolean = false,
     val hdrAware: Boolean = false,
+    val hdrNative: Boolean = false,
 )

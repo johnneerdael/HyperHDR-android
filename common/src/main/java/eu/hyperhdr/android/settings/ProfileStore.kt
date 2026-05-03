@@ -20,6 +20,7 @@ class ProfileStore(private val storage: ProfileStorage) {
             token = if (o.has("token")) o.getString("token") else null,
             highQuality = o.optBoolean("highQuality", false),
             hdrAware = o.optBoolean("hdrAware", false),
+            hdrNative = o.optBoolean("hdrNative", false),
         )
     }
 
@@ -33,6 +34,7 @@ class ProfileStore(private val storage: ProfileStorage) {
             if (p.token != null) put("token", p.token)
             put("highQuality", p.highQuality)
             put("hdrAware", p.hdrAware)
+            put("hdrNative", p.hdrNative)
         }
         storage.write(KEY, o.toString())
     }
