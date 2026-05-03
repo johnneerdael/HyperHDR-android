@@ -48,6 +48,7 @@ class EglNv12Pipeline(
 
     private var frameAvailableLatch = 0
     private val frameLock = Object()
+    private val rateGate = FrameRateGate(targetFps = config.frameRate)
 
     fun start(): Surface {
         runOnGl {
@@ -136,7 +137,12 @@ class EglNv12Pipeline(
             frameAvailableLatch = 0 // collapse — latest wins
         }
         try {
+            // Always advance the SurfaceTexture's buffer queue — skipping updateTexImage
+            // would leave the producer (MediaProjection) blocked when its queue fills.
             surfaceTexture.updateTexImage()
+            // Rate-gate the expensive successors. At 60 Hz source / 30 fps target this
+            // skips half the glReadPixels + send work on the GPU side.
+            if (!rateGate.shouldTick(System.nanoTime())) return
             surfaceTexture.getTransformMatrix(texTransform)
 
             // Pass 1: OES → RGBA at target size
