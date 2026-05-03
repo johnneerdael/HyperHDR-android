@@ -18,13 +18,19 @@ import eu.hyperhdr.android.service.ScreenBinder
  * Composition-scoped service binding. Binds in the composition's lifecycle, unbinds when
  * the composition leaves. Returned [State] is null while the connection is pending;
  * consumers should default-state-flow the case.
+ *
+ * Pass a non-null [stub] to short-circuit service binding (useful in tests / Compose previews).
  */
 @Composable
-fun rememberServiceBinder(): State<ScreenBinder?> {
+fun rememberServiceBinder(stub: ScreenBinder? = null): State<ScreenBinder?> {
     val ctx = LocalContext.current
-    val binderState = remember { mutableStateOf<ScreenBinder?>(null) }
+    val binderState = remember { mutableStateOf(stub) }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(stub) {
+        if (stub != null) {
+            // Stub provided — skip real service interaction entirely.
+            return@DisposableEffect onDispose {}
+        }
         val conn = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                 binderState.value = service as? ScreenBinder

@@ -4,21 +4,22 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
+import eu.hyperhdr.android.tv.compose.screens.MainScreen
+import eu.hyperhdr.android.tv.compose.theme.HyperHdrTheme
 
-class MainActivity : FragmentActivity() {
+class MainActivity : ComponentActivity() {
 
     private val requestNotifPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* result is best-effort */ }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* best-effort */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) {
-            supportFragmentManager.beginTransaction()
-                .replace(android.R.id.content, MainFragment())
-                .commit()
+        setContent {
+            HyperHdrTheme { MainScreen() }
         }
         requestNotificationsIfNeeded()
     }

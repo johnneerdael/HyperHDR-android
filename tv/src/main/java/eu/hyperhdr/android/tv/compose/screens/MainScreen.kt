@@ -1,0 +1,127 @@
+package eu.hyperhdr.android.tv.compose.screens
+
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.media.projection.MediaProjectionManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.tv.material3.Button
+import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
+import eu.hyperhdr.android.service.ScreenBinder
+import eu.hyperhdr.android.service.ServiceState
+import eu.hyperhdr.android.settings.EncryptedProfileStorage
+import eu.hyperhdr.android.settings.ProfileStore
+import eu.hyperhdr.android.stats.LiveStats
+import eu.hyperhdr.android.tv.BuildConfig
+import eu.hyperhdr.android.tv.compose.service.rememberServiceBinder
+import eu.hyperhdr.android.tv.compose.widgets.ConnectionCard
+import eu.hyperhdr.android.tv.compose.widgets.StatsFooter
+import eu.hyperhdr.android.tv.update.UpdateChecker
+import eu.hyperhdr.android.tv.ui.settings.SettingsActivity
+import eu.hyperhdr.android.tv.ui.wizard.WizardActivity
+import kotlinx.coroutines.flow.MutableStateFlow
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+fun MainScreen(stubBinder: ScreenBinder? = null) {
+    val ctx = LocalContext.current
+    val binder by rememberServiceBinder(stub = stubBinder)
+
+    val state by (binder?.state ?: MutableStateFlow(ServiceState.IDLE))
+        .collectAsStateWithLifecycle(ServiceState.IDLE)
+    val stats by (binder?.stats ?: MutableStateFlow(LiveStats(0.0, 0L, 0, 0, null)))
+        .collectAsStateWithLifecycle(LiveStats(0.0, 0L, 0, 0, null))
+    val serverHdr by (binder?.serverHdrSignaled ?: MutableStateFlow(false))
+        .collectAsStateWithLifecycle(false)
+
+    val profile = remember { ProfileStore(EncryptedProfileStorage.create(ctx)).load() }
+
+    var updateAvailable by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        runCatching { UpdateChecker().latest(BuildConfig.VERSION_NAME) }
+            .getOrNull()?.let { updateAvailable = it.tag }
+    }
+
+    val projectionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            binder?.startCapture(result.resultCode, result.data!!)
+        }
+    }
+
+    val toggleFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { toggleFocus.requestFocus() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        ConnectionCard(profile = profile, onClick = {
+            ctx.startActivity(Intent(ctx, WizardActivity::class.java))
+        })
+        Spacer(Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                if (state == ServiceState.STREAMING || state == ServiceState.CONNECTING) {
+                    binder?.stopCapture()
+                } else {
+                    val pmgr = ctx.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                    projectionLauncher.launch(pmgr.createScreenCaptureIntent())
+                }
+            },
+            modifier = Modifier.focusRequester(toggleFocus).focusable(),
+        ) {
+            Text(
+                when (state) {
+                    ServiceState.IDLE -> "Start capture"
+                    ServiceState.CONNECTING -> "Connecting…"
+                    ServiceState.STREAMING -> "Stop capture"
+                    ServiceState.PAUSED -> "Paused (waiting for screen)"
+                    ServiceState.ERROR -> "Error — tap to retry"
+                },
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = {
+            ctx.startActivity(Intent(ctx, SettingsActivity::class.java))
+        }) {
+            Text("Settings", modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        }
+
+        Spacer(Modifier.height(32.dp))
+        StatsFooter(stats = stats, hdrBadge = serverHdr, updateAvailable = updateAvailable)
+    }
+}
