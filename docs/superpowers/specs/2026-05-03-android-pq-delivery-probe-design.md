@@ -49,7 +49,7 @@ User presses **Start**, the system MediaProjection permission prompt appears, us
    - `setDefaultDataSpace(DataSpace.DATASPACE_BT2020_PQ)`
    - `setUsage(USAGE_GPU_SAMPLED_IMAGE or USAGE_CPU_READ_OFTEN)`
    - `setMaxImages(3)`
-2. **SDR-mode capture** — runs for `N=60` frames immediately after, against the same content. Configured via the simpler `ImageReader.newInstance(W, H, ImageFormat.RGBA_8888, 3)`. No dataspace request. This gives us a baseline for comparison.
+2. **SDR-mode capture** — runs for `N=60` frames immediately after, against the same content. Configured via the simpler `ImageReader.newInstance(W, H, PixelFormat.RGBA_8888, 3)`. No dataspace request. This gives us a baseline for comparison.
 3. **Done** — UI shows the output folder path + a Share button (system intent). User can pull files via adb (when set up) or share to cloud storage.
 
 Capture resolution: `1920×1080` fixed. Source resolution doesn't matter for the question we're asking; this is a stable size that's easy to reason about.

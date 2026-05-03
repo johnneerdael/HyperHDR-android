@@ -850,14 +850,14 @@ to record symbolic names alongside int values in the dump."
 **Files:**
 - Create: `probe/src/main/java/eu/hyperhdr/android/probe/SdrProbe.kt`
 
-Mirrors `HdrProbe` but uses the simpler `ImageReader.newInstance(w, h, ImageFormat.RGBA_8888, 3)` constructor — no DataSpace request. Captures the same content for direct comparison.
+Mirrors `HdrProbe` but uses the simpler `ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 3)` constructor — no DataSpace request. Captures the same content for direct comparison.
 
 - [ ] **Step 1: Implement `SdrProbe`**
 
 ```kotlin
 package eu.hyperhdr.android.probe
 
-import android.graphics.ImageFormat
+import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.Image
@@ -873,7 +873,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
  * SDR baseline capture. Same MediaProjection source, same target frame count, simpler
- * ImageReader configuration: ImageFormat.RGBA_8888, no DataSpace request. Output:
+ * ImageReader configuration: PixelFormat.RGBA_8888, no DataSpace request. Output:
  *   - `frame-sdr-NNNN.raw`  — RGBA_8888 buffer (W*H*4 bytes), native byte order
  *   - one metadata line per frame via [metadataWriter]
  *
@@ -897,7 +897,7 @@ class SdrProbe(
     private val handler = Handler(thread.looper)
 
     suspend fun run(): Result<Int> = suspendCancellableCoroutine { cont ->
-        val reader = ImageReader.newInstance(width, height, ImageFormat.RGBA_8888, 3)
+        val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 3)
         var frameCount = 0
         var virtualDisplay: VirtualDisplay? = null
 
@@ -1036,7 +1036,7 @@ git add probe/src/main/java/eu/hyperhdr/android/probe/SdrProbe.kt
 git commit -m "feat(probe): SdrProbe — ImageReader.RGBA_8888 baseline capture
 
 Same MediaProjection source as HdrProbe, simpler reader configuration
-(no DataSpace request, ImageFormat.RGBA_8888). Computes a luma-proxy
+(no DataSpace request, PixelFormat.RGBA_8888). Computes a luma-proxy
 histogram in the same 10-bit binning as HdrProbe so the analyze.py
 script can overlay the two and tell whether HDR mode produced
 materially different values."

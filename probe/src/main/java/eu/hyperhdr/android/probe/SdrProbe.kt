@@ -16,7 +16,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
  * SDR baseline capture. Same MediaProjection source, same target frame count, simpler
- * ImageReader configuration: ImageFormat.RGBA_8888, no DataSpace request. Output:
+ * ImageReader configuration: PixelFormat.RGBA_8888, no DataSpace request. Output:
  *   - `frame-sdr-NNNN.raw`  — RGBA_8888 buffer (W*H*4 bytes), native byte order
  *   - one metadata line per frame via [metadataWriter]
  *
