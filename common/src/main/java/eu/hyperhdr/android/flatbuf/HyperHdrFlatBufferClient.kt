@@ -43,6 +43,12 @@ class HyperHdrFlatBufferClient(
             val strideY: Int, val strideUv: Int,
         ) : Outbound
 
+        data class P010(
+            val yPlane: ByteArray, val uvPlane: ByteArray,
+            val width: Int, val height: Int,
+            val strideY: Int, val strideUv: Int,
+        ) : Outbound
+
         data class Color(val rgb: Int, val durationMs: Int) : Outbound
         data class Clear(val priority: Int) : Outbound
         object Register : Outbound
@@ -106,6 +112,16 @@ class HyperHdrFlatBufferClient(
                     msg.width, msg.height, msg.strideY, msg.strideUv,
                 )
                 val imgOff = Image.createImage(builder, ImageType.NV12Image, nv12Off, -1)
+                Request.createRequest(builder, Command.Image, imgOff)
+            }
+            is Outbound.P010 -> {
+                val yOff = hyperhdrnet.P010Image.createDataYVector(builder, msg.yPlane)
+                val uvOff = hyperhdrnet.P010Image.createDataUvVector(builder, msg.uvPlane)
+                val p010Off = hyperhdrnet.P010Image.createP010Image(
+                    builder, yOff, uvOff,
+                    msg.width, msg.height, msg.strideY, msg.strideUv,
+                )
+                val imgOff = Image.createImage(builder, ImageType.P010Image, p010Off, -1)
                 Request.createRequest(builder, Command.Image, imgOff)
             }
             is Outbound.Color -> {
@@ -178,6 +194,13 @@ class HyperHdrFlatBufferClient(
         width: Int, height: Int, strideY: Int, strideUv: Int,
     ) {
         outbox.trySend(Outbound.Nv12(yPlane, uvPlane, width, height, strideY, strideUv))
+    }
+
+    override fun sendP010(
+        yPlane: ByteArray, uvPlane: ByteArray,
+        width: Int, height: Int, strideY: Int, strideUv: Int,
+    ) {
+        outbox.trySend(Outbound.P010(yPlane, uvPlane, width, height, strideY, strideUv))
     }
 
     fun clear(priority: Int = -1) {

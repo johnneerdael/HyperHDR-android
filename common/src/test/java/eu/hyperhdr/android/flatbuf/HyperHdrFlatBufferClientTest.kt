@@ -144,4 +144,55 @@ class HyperHdrFlatBufferClientTest {
             client.close()
         }
     }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `sendP010 emits an Image frame with P010 payload and correct strides`() = runTest {
+        FakeHyperHdrServer().use { server ->
+            val client = HyperHdrFlatBufferClient(
+                host = "127.0.0.1",
+                port = server.port,
+                priority = 100,
+            )
+            client.connect()
+
+            // Drain the Register frame.
+            withContext(Dispatchers.Default.limitedParallelism(1)) {
+                withTimeout(2_000) { server.receiveFrame() }
+            }
+
+            // 4×2 P010 — 2 bytes per Y sample, 2 bytes per Cb/Cr sample at half resolution.
+            // Y plane: 4 * 2 samples * 2 bytes = 16 bytes
+            // UV plane: (4/2) * (2/2) Cb/Cr pairs * 2 bytes/sample * 2 samples = 8 bytes — but
+            // P010 interleaves Cb,Cr at full-pair count = (W/2)*(H/2)*2*2 = W*H bytes total.
+            val w = 4
+            val h = 2
+            val y = ByteArray(w * h * 2) { (it + 1).toByte() }
+            val uv = ByteArray(w * h) { (it + 100).toByte() }
+
+            client.sendP010(y, uv, w, h, strideY = w * 2, strideUv = w * 2)
+
+            val frame = withContext(Dispatchers.Default.limitedParallelism(1)) {
+                withTimeout(2_000) { server.receiveFrame() }
+            }
+            val request = Request.getRootAsRequest(ByteBuffer.wrap(frame))
+            assertThat(request.commandType()).isEqualTo(Command.Image)
+            val image = Image().also { request.command(it) }
+            assertThat(image.dataType()).isEqualTo(ImageType.P010Image)
+
+            val p010 = hyperhdrnet.P010Image().also { image.data(it) }
+            assertThat(p010.width()).isEqualTo(w)
+            assertThat(p010.height()).isEqualTo(h)
+            assertThat(p010.strideY()).isEqualTo(w * 2)
+            assertThat(p010.strideUv()).isEqualTo(w * 2)
+            assertThat(p010.dataYLength()).isEqualTo(y.size)
+            assertThat(p010.dataUvLength()).isEqualTo(uv.size)
+            assertThat(p010.dataY(0).toInt()).isEqualTo(1)
+            assertThat(p010.dataY(y.size - 1).toInt() and 0xFF).isEqualTo(16)
+            assertThat(p010.dataUv(0).toInt() and 0xFF).isEqualTo(100)
+            assertThat(p010.dataUv(uv.size - 1).toInt() and 0xFF).isEqualTo(107)
+
+            client.close()
+        }
+    }
 }
