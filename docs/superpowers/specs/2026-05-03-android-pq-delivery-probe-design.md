@@ -25,7 +25,7 @@ This is a feasibility decision, not an integration. The probe runs once on real 
 
 ## Architecture
 
-A new Gradle module `:probe` in the `HyperHDR-android` repo. Standalone APK with its own application ID `eu.hyperhdr.android.probe` so it installs alongside the production app and can be uninstalled trivially. **Min SDK 34** — the probe explicitly only targets devices that have the `ImageReader.Builder().setDataSpace()` API. Compose-for-TV UI, single Activity, Kotlin only, ~700 LOC including offline analysis script.
+A new Gradle module `:probe` in the `HyperHDR-android` repo. Standalone APK with its own application ID `eu.hyperhdr.android.probe` so it installs alongside the production app and can be uninstalled trivially. **Min SDK 34** — the probe explicitly only targets devices that have the `ImageReader.Builder().setDefaultDataSpace()` API. Compose-for-TV UI, single Activity, Kotlin only, ~700 LOC including offline analysis script.
 
 Module owns:
 - One Activity (capture flow + status display + share-results button)
@@ -45,8 +45,8 @@ Idle  →  [Start]  →  Capturing (HDR mode)  →  Capturing (SDR mode)  →  D
 User presses **Start**, the system MediaProjection permission prompt appears, user grants. The probe then:
 
 1. **HDR-mode capture** — runs for `N=60` frames. Configured via `ImageReader.Builder(W, H)`:
-   - `setHardwareBufferFormat(HardwareBuffer.YCBCR_P010)`
-   - `setDataSpace(DataSpace.DATASPACE_BT2020_PQ)`
+   - `setDefaultHardwareBufferFormat(HardwareBuffer.YCBCR_P010)`
+   - `setDefaultDataSpace(DataSpace.DATASPACE_BT2020_PQ)`
    - `setUsage(USAGE_GPU_SAMPLED_IMAGE or USAGE_CPU_READ_OFTEN)`
    - `setMaxImages(3)`
 2. **SDR-mode capture** — runs for `N=60` frames immediately after, against the same content. Configured via the simpler `ImageReader.newInstance(W, H, ImageFormat.RGBA_8888, 3)`. No dataspace request. This gives us a baseline for comparison.
@@ -144,7 +144,7 @@ The integration phase (conditional on Go) is **out of scope** for this spec. It 
 |---|---|
 | MediaProjection silently tone-maps to SDR despite our DataSpace request — the probe returns PARTIAL or NO-GO | Explicitly designed for: that's exactly what the probe answers. SDR baseline capture lets us tell the difference unambiguously. |
 | Google TV Streamer's vendor implementation differs from stock Android 14 | Acceptable — the probe answers "does it work on this device", which is what the user actually wants to know. We don't claim universality. |
-| `ImageReader.Builder().setDataSpace()` throws on the device despite being API 34 | The probe wraps the configuration in try/catch and reports the exception in metadata. If thrown, NO-GO without further work. |
+| `ImageReader.Builder().setDefaultDataSpace()` throws on the device despite being API 34 | The probe wraps the configuration in try/catch and reports the exception in metadata. If thrown, NO-GO without further work. |
 | Probe captures HDR mode but never produces frames (Surface configured but no Image arrives) | The probe times out HDR capture at 10s; if no frames arrive it transitions to SDR mode and reports the timeout. NO-GO outcome. |
 | `Image.getDataSpace()` API 34 returns 0 or unknown even for HDR-configured sources | Recorded in metadata; the analysis script reports it. Forces NO-GO classification. |
 
