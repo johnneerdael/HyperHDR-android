@@ -45,4 +45,12 @@ class CaptureConfigTest {
             CaptureConfig(width = 160, height = 90, frameRate = 0, tier = CaptureTier.SDR)
         }
     }
+
+    @Test
+    fun `HDR_NATIVE tier is a recognized CaptureTier value`() {
+        // Lightweight presence check — the actual capability probe + pipeline selection
+        // happens in HyperHdrCaptureService and EglP010Pipeline.
+        val cfg = CaptureConfig(width = 160, height = 90, frameRate = 30, tier = CaptureTier.HDR_NATIVE)
+        assertThat(cfg.tier).isEqualTo(CaptureTier.HDR_NATIVE)
+    }
 }

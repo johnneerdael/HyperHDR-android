@@ -59,6 +59,7 @@ class EglNv12Pipeline(
                 when (config.tier) {
                     CaptureTier.SDR -> sdrDownscale = DownscaleProgram()
                     CaptureTier.HDR_AWARE -> hdrDownscale = HdrToneMapShader()
+                    CaptureTier.HDR_NATIVE -> hdrDownscale = HdrToneMapShader() // routed to EglP010Pipeline in practice
                 }
                 pack = Nv12PackProgram()
 
