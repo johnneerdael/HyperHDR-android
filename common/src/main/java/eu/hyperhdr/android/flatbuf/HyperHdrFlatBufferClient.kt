@@ -148,7 +148,11 @@ class HyperHdrFlatBufferClient(
                 val targetPort = port
                 val sock = Socket().apply {
                     tcpNoDelay = true
-                    sendBufferSize = 8192
+                    // Sized just above one high-preset NV12 frame (31,104 bytes) so a single
+                    // out.write fits in the kernel send buffer without partial-write thrash.
+                    // Kept conservative — much larger would queue stale frames despite our
+                    // application-layer latest-wins policy, hiding latency the user can't see.
+                    sendBufferSize = 32 * 1024
                     receiveBufferSize = 4096
                     connect(InetSocketAddress(host, targetPort), connectTimeoutMs)
                 }
