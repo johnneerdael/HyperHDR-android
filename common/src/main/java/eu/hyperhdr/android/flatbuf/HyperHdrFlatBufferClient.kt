@@ -177,9 +177,10 @@ class HyperHdrFlatBufferClient(
         try {
             val size = buf.remaining()
             out.writeInt(size)
-            val payload = ByteArray(size)
-            buf.get(payload)
-            out.write(payload)
+            // FlatBufferBuilder.dataBuffer() returns a heap-backed slice of the builder's
+            // internal byte[]. Writing through its backing array avoids one ByteArray
+            // allocation + bulk copy per frame.
+            out.write(buf.array(), buf.arrayOffset() + buf.position(), size)
             out.flush()
         } catch (_: IOException) {
             _state.value = ConnectionState.ERROR
