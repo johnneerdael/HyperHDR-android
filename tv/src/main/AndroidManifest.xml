@@ -46,8 +46,7 @@
 
         <activity
             android:name="eu.hyperhdr.android.tv.ui.wizard.WizardActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Leanback.GuidedStep"/>
+            android:exported="false"/>
 
         <activity
             android:name="eu.hyperhdr.android.tv.ui.MainActivity"
