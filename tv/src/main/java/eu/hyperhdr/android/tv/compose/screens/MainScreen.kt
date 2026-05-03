@@ -7,7 +7,6 @@ import android.media.projection.MediaProjectionManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -99,7 +98,7 @@ fun MainScreen(stubBinder: ScreenBinder? = null) {
                     projectionLauncher.launch(pmgr.createScreenCaptureIntent())
                 }
             },
-            modifier = Modifier.focusRequester(toggleFocus).focusable(),
+            modifier = Modifier.focusRequester(toggleFocus),
         ) {
             Text(
                 when (state) {
@@ -118,7 +117,11 @@ fun MainScreen(stubBinder: ScreenBinder? = null) {
         Button(onClick = {
             ctx.startActivity(Intent(ctx, SettingsActivity::class.java))
         }) {
-            Text("Settings", modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            Text(
+                "Settings",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+            )
         }
 
         Spacer(Modifier.height(32.dp))

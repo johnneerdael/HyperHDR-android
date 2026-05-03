@@ -101,14 +101,6 @@ fun SettingsScreen(stubBinder: ScreenBinder? = null) {
             )
         }
         item {
-            SwitchPreference(
-                title = "Signal HDR to HyperHDR",
-                summary = "Tells HyperHDR to apply its tone-map LUT when content is HDR",
-                checked = true,
-                onChange = { /* settings-flag-only in v1.0; service uses HdrDetector either way */ },
-            )
-        }
-        item {
             // Probe runs once per Compose lifecycle; results are cached.
             val p010Capable = remember { eu.hyperhdr.android.capture.Egl16BitCapabilityProbe.supportsR16UiFboStandalone() }
             val canEnable = (profile?.hdrAware == true) && p010Capable
@@ -141,16 +133,6 @@ fun SettingsScreen(stubBinder: ScreenBinder? = null) {
                 title = "Auth token",
                 summary = if (profile?.token != null) "Set" else "Not set",
                 onClick = { /* v1.0.0 stub: token edit deferred — wizard re-paste path covers this */ },
-            )
-        }
-
-        item { CategoryHeader("Behavior") }
-        item {
-            SwitchPreference(
-                title = "Start on boot",
-                summary = "Foreground service starts at boot (capture still requires user consent)",
-                checked = true,
-                onChange = { /* settings-flag-only; boot receiver currently unconditional in Plan 3 */ },
             )
         }
 
