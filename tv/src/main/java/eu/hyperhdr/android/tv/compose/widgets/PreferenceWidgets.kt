@@ -1,6 +1,7 @@
 package eu.hyperhdr.android.tv.compose.widgets
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,7 +15,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Card
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Switch
@@ -42,7 +42,7 @@ fun SwitchPreference(
     modifier: Modifier = Modifier,
 ) {
     var localChecked by remember(checked) { mutableStateOf(checked) }
-    Card(
+    FocusableSurface(
         onClick = {
             if (enabled) {
                 val next = !localChecked
@@ -50,20 +50,18 @@ fun SwitchPreference(
                 onChange(next)
             }
         },
+        enabled = enabled,
+        contentPadding = PaddingValues(16.dp),
         modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 if (summary != null) {
-                    Text(
-                        summary,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Text(summary, style = MaterialTheme.typography.bodySmall)
                 }
             }
             Spacer(Modifier.width(16.dp))
@@ -81,18 +79,16 @@ fun ClickablePreference(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    FocusableSurface(
         onClick = { if (enabled) onClick() },
+        enabled = enabled,
+        contentPadding = PaddingValues(16.dp),
         modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             if (summary != null) {
-                Text(
-                    summary,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Text(summary, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -101,8 +97,6 @@ fun ClickablePreference(
 /**
  * Editable text preference. Compose-for-TV's idiom for text input is to delegate to a
  * full-screen editor on click rather than inline editing (which behaves badly with d-pad).
- * For v1.0.0 we keep it simple — clicking shows current value; the underlying preference is
- * edited via a dialog activity that's already part of the wizard flow.
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable

@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,9 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -40,6 +42,7 @@ import eu.hyperhdr.android.tv.BuildConfig
 import eu.hyperhdr.android.tv.compose.service.rememberServiceBinder
 import eu.hyperhdr.android.tv.compose.widgets.AvailableUpgrade
 import eu.hyperhdr.android.tv.compose.widgets.ConnectionCard
+import eu.hyperhdr.android.tv.compose.widgets.FocusableSurface
 import eu.hyperhdr.android.tv.compose.widgets.StatsFooter
 import eu.hyperhdr.android.tv.update.UpdateChecker
 import eu.hyperhdr.android.tv.update.UpdateInstaller
@@ -84,6 +87,10 @@ fun MainScreen(stubBinder: ScreenBinder? = null) {
     val toggleFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { toggleFocus.requestFocus() }
 
+    // Identical width for all 3 home buttons. 480.dp gives a comfortable target on
+    // 1080p TV displays without filling the whole screen.
+    val homeButtonWidth = Modifier.width(480.dp)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -92,12 +99,14 @@ fun MainScreen(stubBinder: ScreenBinder? = null) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        ConnectionCard(profile = profile, onClick = {
-            ctx.startActivity(Intent(ctx, WizardActivity::class.java))
-        })
+        ConnectionCard(
+            profile = profile,
+            modifier = homeButtonWidth,
+            onClick = { ctx.startActivity(Intent(ctx, WizardActivity::class.java)) },
+        )
         Spacer(Modifier.height(16.dp))
 
-        Button(
+        FocusableSurface(
             onClick = {
                 if (state == ServiceState.STREAMING || state == ServiceState.CONNECTING) {
                     binder?.stopCapture()
@@ -106,10 +115,10 @@ fun MainScreen(stubBinder: ScreenBinder? = null) {
                     projectionLauncher.launch(pmgr.createScreenCaptureIntent())
                 }
             },
-            modifier = Modifier.focusRequester(toggleFocus),
+            modifier = homeButtonWidth.focusRequester(toggleFocus),
         ) {
             Text(
-                when (state) {
+                text = when (state) {
                     ServiceState.IDLE -> "Start capture"
                     ServiceState.CONNECTING -> "Connecting…"
                     ServiceState.STREAMING -> "Stop capture"
@@ -117,18 +126,21 @@ fun MainScreen(stubBinder: ScreenBinder? = null) {
                     ServiceState.ERROR -> "Error — tap to retry"
                 },
                 style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
-
         Spacer(Modifier.height(16.dp))
-        Button(onClick = {
-            ctx.startActivity(Intent(ctx, SettingsActivity::class.java))
-        }) {
+
+        FocusableSurface(
+            onClick = { ctx.startActivity(Intent(ctx, SettingsActivity::class.java)) },
+            modifier = homeButtonWidth,
+        ) {
             Text(
-                "Settings",
+                text = "Settings",
                 style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
 

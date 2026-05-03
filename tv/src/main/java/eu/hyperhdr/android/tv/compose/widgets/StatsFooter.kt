@@ -2,13 +2,13 @@ package eu.hyperhdr.android.tv.compose.widgets
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -59,16 +59,13 @@ fun StatsFooter(
                 UpdateInstaller.State.Idle -> "⬆  v${updateAvailable.tag} available — install"
             }
             val isBusy = updateState is UpdateInstaller.State.Downloading
-            Button(
+            FocusableSurface(
                 onClick = { if (!isBusy) onUpgradeClick() },
                 enabled = !isBusy,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 modifier = Modifier.testTag("upgrade_banner"),
             ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
+                Text(text = label, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
