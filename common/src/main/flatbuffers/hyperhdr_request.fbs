@@ -21,7 +21,21 @@ table NV12Image {
   stride_uv:int = 0;
 }
 
-union ImageType {RawImage, NV12Image}
+// 10-bit per channel, Microsoft P010 byte layout: 10 high bits + 6 zero pad
+// per 16-bit little-endian word. Strides are in bytes (= width * 2 for both
+// planes). Routes to the same FrameDecoder path as the V4L2/MF/DX P010
+// grabbers, so HDR clients can deliver PQ-encoded frames straight to
+// HyperHDR's tone-map LUT.
+table P010Image {
+  data_y:[ubyte];
+  data_uv:[ubyte];
+  width:int;
+  height:int;
+  stride_y:int = 0;
+  stride_uv:int = 0;
+}
+
+union ImageType {RawImage, NV12Image, P010Image}
 
 table Image {
   data:ImageType (required);
