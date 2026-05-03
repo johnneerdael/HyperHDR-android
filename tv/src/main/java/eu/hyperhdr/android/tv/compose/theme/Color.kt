@@ -2,9 +2,10 @@ package eu.hyperhdr.android.tv.compose.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary accent — focus ring, badges, switches. LED-green for "this app talks to LEDs."
-val HyperHdrGreen = Color(0xFF22D08C)
-val HyperHdrGreenDim = Color(0xFF14784F)
+// Primary accent — focus background, category headers, switches. Matches the neon red
+// in the HyperHDR wordmark / square icon (see hyperhdr-android.png, hyperhdr-square.png).
+val HyperHdrRed = Color(0xFFE40B00)
+val HyperHdrRedDim = Color(0xFF6E0500)
 
 // Dark surfaces — TV apps live in dark rooms.
 val SurfaceBlack = Color(0xFF0A0A0A)

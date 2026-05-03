@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -91,60 +92,65 @@ fun MainScreen(stubBinder: ScreenBinder? = null) {
     // 1080p TV displays without filling the whole screen.
     val homeButtonWidth = Modifier.width(480.dp)
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .padding(48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
     ) {
-        ConnectionCard(
-            profile = profile,
-            modifier = homeButtonWidth,
-            onClick = { ctx.startActivity(Intent(ctx, WizardActivity::class.java)) },
-        )
-        Spacer(Modifier.height(16.dp))
-
-        FocusableSurface(
-            onClick = {
-                if (state == ServiceState.STREAMING || state == ServiceState.CONNECTING) {
-                    binder?.stopCapture()
-                } else {
-                    val pmgr = ctx.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                    projectionLauncher.launch(pmgr.createScreenCaptureIntent())
-                }
-            },
-            modifier = homeButtonWidth.focusRequester(toggleFocus),
+        // Button stack — centred both horizontally and vertically in the screen.
+        Column(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            Text(
-                text = when (state) {
-                    ServiceState.IDLE -> "Start capture"
-                    ServiceState.CONNECTING -> "Connecting…"
-                    ServiceState.STREAMING -> "Stop capture"
-                    ServiceState.PAUSED -> "Paused (waiting for screen)"
-                    ServiceState.ERROR -> "Error — tap to retry"
+            ConnectionCard(
+                profile = profile,
+                modifier = homeButtonWidth,
+                onClick = { ctx.startActivity(Intent(ctx, WizardActivity::class.java)) },
+            )
+            Spacer(Modifier.height(16.dp))
+
+            FocusableSurface(
+                onClick = {
+                    if (state == ServiceState.STREAMING || state == ServiceState.CONNECTING) {
+                        binder?.stopCapture()
+                    } else {
+                        val pmgr = ctx.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                        projectionLauncher.launch(pmgr.createScreenCaptureIntent())
+                    }
                 },
-                style = MaterialTheme.typography.titleLarge,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        Spacer(Modifier.height(16.dp))
+                modifier = homeButtonWidth.focusRequester(toggleFocus),
+            ) {
+                Text(
+                    text = when (state) {
+                        ServiceState.IDLE -> "Start capture"
+                        ServiceState.CONNECTING -> "Connecting…"
+                        ServiceState.STREAMING -> "Stop capture"
+                        ServiceState.PAUSED -> "Paused (waiting for screen)"
+                        ServiceState.ERROR -> "Error — tap to retry"
+                    },
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Spacer(Modifier.height(16.dp))
 
-        FocusableSurface(
-            onClick = { ctx.startActivity(Intent(ctx, SettingsActivity::class.java)) },
-            modifier = homeButtonWidth,
-        ) {
-            Text(
-                text = "Settings",
-                style = MaterialTheme.typography.titleLarge,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            FocusableSurface(
+                onClick = { ctx.startActivity(Intent(ctx, SettingsActivity::class.java)) },
+                modifier = homeButtonWidth,
+            ) {
+                Text(
+                    text = "Settings",
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
-        Spacer(Modifier.height(32.dp))
+        // Stats + upgrade banner — pinned to the bottom edge.
         StatsFooter(
             stats = stats,
             hdrBadge = serverHdr,
@@ -159,6 +165,7 @@ fun MainScreen(stubBinder: ScreenBinder? = null) {
                 }
                 coroutineScope.launch { installer.start(url, upgrade.tag) }
             },
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 }

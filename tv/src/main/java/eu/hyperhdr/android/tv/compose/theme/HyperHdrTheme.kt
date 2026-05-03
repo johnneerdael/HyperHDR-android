@@ -10,9 +10,9 @@ import androidx.tv.material3.darkColorScheme
 fun HyperHdrTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = HyperHdrGreen,
+            primary = HyperHdrRed,
             onPrimary = SurfaceBlack,
-            primaryContainer = HyperHdrGreenDim,
+            primaryContainer = HyperHdrRedDim,
             onPrimaryContainer = OnSurfaceWhite,
             background = SurfaceBlack,
             onBackground = OnSurfaceWhite,
