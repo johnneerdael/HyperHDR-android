@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class HyperHdrJsonApiClient(
     private val host: String,
-    private val port: Int = 19444,
+    private val port: Int = 8090,
     private val httpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(2, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.SECONDS)

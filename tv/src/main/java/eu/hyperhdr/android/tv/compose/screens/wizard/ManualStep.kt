@@ -25,7 +25,7 @@ import eu.hyperhdr.android.settings.ServerProfile
 fun ManualStep(onNext: (ServerProfile) -> Unit) {
     var host by remember { mutableStateOf("") }
     var flatPort by remember { mutableStateOf("19400") }
-    var jsonPort by remember { mutableStateOf("19444") }
+    var jsonPort by remember { mutableStateOf("8090") }
 
     Column(
         modifier = Modifier
@@ -51,7 +51,7 @@ fun ManualStep(onNext: (ServerProfile) -> Unit) {
         OutlinedTextField(
             value = jsonPort,
             onValueChange = { jsonPort = it },
-            label = { androidx.compose.material3.Text("JSON-API port") },
+            label = { androidx.compose.material3.Text("Web / JSON-API port") },
             modifier = Modifier.padding(vertical = 4.dp),
         )
 
@@ -62,7 +62,7 @@ fun ManualStep(onNext: (ServerProfile) -> Unit) {
                     onNext(ServerProfile(
                         host = host.trim(),
                         flatbufPort = flatPort.toIntOrNull() ?: 19400,
-                        jsonPort = jsonPort.toIntOrNull() ?: 19444,
+                        jsonPort = jsonPort.toIntOrNull() ?: 8090,
                     ))
                 }
             },

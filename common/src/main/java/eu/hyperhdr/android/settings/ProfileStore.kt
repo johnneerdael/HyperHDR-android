@@ -14,7 +14,7 @@ class ProfileStore(private val storage: ProfileStorage) {
         return ServerProfile(
             host = o.getString("host"),
             flatbufPort = o.optInt("flatbufPort", 19400),
-            jsonPort = o.optInt("jsonPort", 19444),
+            jsonPort = o.optInt("jsonPort", 8090),
             instanceId = o.optInt("instanceId", 0),
             priority = o.optInt("priority", 100),
             token = if (o.has("token")) o.getString("token") else null,
