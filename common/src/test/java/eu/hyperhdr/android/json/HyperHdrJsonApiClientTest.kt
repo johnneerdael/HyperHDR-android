@@ -174,4 +174,40 @@ class HyperHdrJsonApiClientTest {
         assertThat(info.flatbufferWireVersion).isNull()
         assertThat(info.supportsP010).isFalse()
     }
+
+    @Test
+    fun `serverInfo treats flatbuffer with imageFormats not an array as empty capabilities`() = runTest {
+        server.enqueue(MockResponse().setBody("""
+            {"success":true,"command":"serverinfo","tan":1,
+             "info":{"hyperhdr_version":"22.0.0","instance":[],
+                     "flatbuffer":{"imageFormats":"oops","wireVersion":2}}}
+        """.trimIndent()))
+
+        val client = HyperHdrJsonApiClient(host = server.hostName, port = server.port)
+        val info = client.serverInfo()
+
+        assertThat(info.flatbufferFormats).isEmpty()
+        // wireVersion still parses since it's a valid int — only the malformed
+        // imageFormats field is ignored.
+        assertThat(info.flatbufferWireVersion).isEqualTo(2)
+        assertThat(info.supportsP010).isFalse()
+    }
+
+    @Test
+    fun `serverInfo silently drops non-string entries from imageFormats`() = runTest {
+        server.enqueue(MockResponse().setBody("""
+            {"success":true,"command":"serverinfo","tan":1,
+             "info":{"hyperhdr_version":"22.0.0","instance":[],
+                     "flatbuffer":{
+                       "imageFormats":["RawImage", 42, null, "P010Image"],
+                       "wireVersion":2}}}
+        """.trimIndent()))
+
+        val client = HyperHdrJsonApiClient(host = server.hostName, port = server.port)
+        val info = client.serverInfo()
+
+        assertThat(info.flatbufferFormats).containsExactly("RawImage", "P010Image")
+        assertThat(info.flatbufferWireVersion).isEqualTo(2)
+        assertThat(info.supportsP010).isTrue()
+    }
 }

@@ -105,10 +105,17 @@ class HyperHdrJsonApiClient(
     private fun parseFlatbufferBlock(info: JSONObject): Pair<Set<String>, Int?> {
         val flatbuf = info.optJSONObject("flatbuffer") ?: return emptySet<String>() to null
         val formatsArray = flatbuf.optJSONArray("imageFormats")
-        val formats = if (formatsArray != null) {
-            buildSet { for (i in 0 until formatsArray.length()) add(formatsArray.getString(i)) }
+        val formats: Set<String> = if (formatsArray != null) {
+            buildSet {
+                for (i in 0 until formatsArray.length()) {
+                    // Lenient: skip non-string entries (numbers, booleans, null) so a
+                    // malformed fork can't break the whole serverInfo response.
+                    (formatsArray.opt(i) as? String)?.let { add(it) }
+                }
+            }
         } else emptySet()
-        val wireVersion = if (flatbuf.has("wireVersion")) flatbuf.optInt("wireVersion") else null
+        val wireVersion = if (flatbuf.has("wireVersion") && !flatbuf.isNull("wireVersion"))
+            flatbuf.getInt("wireVersion") else null
         return formats to wireVersion
     }
 
