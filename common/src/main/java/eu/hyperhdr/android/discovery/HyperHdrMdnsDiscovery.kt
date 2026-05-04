@@ -13,8 +13,13 @@ class HyperHdrMdnsDiscovery(
     private val wifiManager: WifiManager? = null,
 ) {
     companion object {
-        private const val TYPE_FLATBUF = "_hyperhdr-flatbuf._tcp"
-        private const val TYPE_JSON = "_hyperhdr-json._tcp"
+        // HyperHDR's WebServer registers exactly one Bonjour service. The JSON server
+        // (raw TCP, port 19400) and flatbuffers server are NOT advertised — only this.
+        // See HyperHDR/sources/bonjour/DiscoveryRecord.cpp and webserver/WebServer.cpp.
+        private const val TYPE_HTTP = "_hyperhdr-http._tcp"
+        // The raw TCP flatbuffers port is fixed by HyperHDR upstream and not configurable
+        // through mDNS — fall back to the documented default and let manual entry override.
+        private const val DEFAULT_FLATBUF_PORT = 19400
         private const val TAG = "HyperHdrMdns"
     }
 
@@ -22,8 +27,7 @@ class HyperHdrMdnsDiscovery(
     private val _servers = MutableStateFlow<List<DiscoveredServer>>(emptyList())
     val servers: StateFlow<List<DiscoveredServer>> = _servers.asStateFlow()
 
-    private var flatbufListener: NsdManager.DiscoveryListener? = null
-    private var jsonListener: NsdManager.DiscoveryListener? = null
+    private var listener: NsdManager.DiscoveryListener? = null
     private var multicastLock: WifiManager.MulticastLock? = null
 
     fun start() {
@@ -31,22 +35,18 @@ class HyperHdrMdnsDiscovery(
             setReferenceCounted(true)
             acquire()
         }
-        flatbufListener = listenerFor(TYPE_FLATBUF, isFlatbuf = true)
-        jsonListener = listenerFor(TYPE_JSON, isFlatbuf = false)
-        nsd.discoverServices(TYPE_FLATBUF, NsdManager.PROTOCOL_DNS_SD, flatbufListener)
-        nsd.discoverServices(TYPE_JSON, NsdManager.PROTOCOL_DNS_SD, jsonListener)
+        listener = makeListener()
+        nsd.discoverServices(TYPE_HTTP, NsdManager.PROTOCOL_DNS_SD, listener)
     }
 
     fun stop() {
-        flatbufListener?.let { runCatching { nsd.stopServiceDiscovery(it) } }
-        jsonListener?.let { runCatching { nsd.stopServiceDiscovery(it) } }
-        flatbufListener = null
-        jsonListener = null
+        listener?.let { runCatching { nsd.stopServiceDiscovery(it) } }
+        listener = null
         runCatching { multicastLock?.takeIf { it.isHeld }?.release() }
         multicastLock = null
     }
 
-    private fun listenerFor(type: String, isFlatbuf: Boolean) = object : NsdManager.DiscoveryListener {
+    private fun makeListener() = object : NsdManager.DiscoveryListener {
         override fun onStartDiscoveryFailed(s: String?, errorCode: Int) {}
         override fun onStopDiscoveryFailed(s: String?, errorCode: Int) {}
         override fun onDiscoveryStarted(s: String?) {}
@@ -57,14 +57,22 @@ class HyperHdrMdnsDiscovery(
                 override fun onResolveFailed(s: NsdServiceInfo?, errorCode: Int) {}
                 override fun onServiceResolved(resolved: NsdServiceInfo) {
                     val host = resolved.host?.hostAddress ?: return
-                    pairing.onResolved(resolved.serviceName ?: host, host, resolved.port, isFlatbuf)
+                    pairing.onResolved(
+                        name = resolved.serviceName ?: host,
+                        host = host,
+                        // The advertised port IS HyperHDR's web server port and the same
+                        // endpoint that hosts /json-rpc over HTTP — exactly what the
+                        // OkHttp-based JSON client needs.
+                        jsonPort = resolved.port,
+                        flatbufPort = DEFAULT_FLATBUF_PORT,
+                    )
                     _servers.value = pairing.servers()
                 }
             })
         }
 
         override fun onServiceLost(serviceInfo: NsdServiceInfo) {
-            pairing.onLost(serviceInfo.serviceName ?: return, isFlatbuf)
+            pairing.onLost(serviceInfo.serviceName ?: return)
             _servers.value = pairing.servers()
         }
     }

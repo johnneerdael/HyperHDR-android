@@ -6,34 +6,41 @@ import org.junit.Test
 class DiscoveryPairingTest {
 
     @Test
-    fun `flatbuf and json on same host get paired`() {
+    fun `resolved record produces a discovered server`() {
         val pairing = DiscoveryPairing()
-        pairing.onResolved("server-a", "192.168.1.10", 19400, isFlatbuf = true)
-        assertThat(pairing.servers()).isEmpty()
+        pairing.onResolved("server-a", "192.168.1.10", jsonPort = 8090, flatbufPort = 19400)
 
-        pairing.onResolved("server-a", "192.168.1.10", 19444, isFlatbuf = false)
         assertThat(pairing.servers()).containsExactly(
-            DiscoveredServer("server-a", "192.168.1.10", 19400, 19444),
+            DiscoveredServer("server-a", "192.168.1.10", flatbufPort = 19400, jsonPort = 8090),
         )
     }
 
     @Test
-    fun `multiple hosts produce multiple paired servers`() {
+    fun `multiple hosts produce multiple servers`() {
         val pairing = DiscoveryPairing()
-        pairing.onResolved("a", "192.168.1.10", 19400, true)
-        pairing.onResolved("a", "192.168.1.10", 19444, false)
-        pairing.onResolved("b", "192.168.1.20", 19400, true)
-        pairing.onResolved("b", "192.168.1.20", 19444, false)
+        pairing.onResolved("a", "192.168.1.10", jsonPort = 8090, flatbufPort = 19400)
+        pairing.onResolved("b", "192.168.1.20", jsonPort = 8090, flatbufPort = 19400)
 
         assertThat(pairing.servers()).hasSize(2)
     }
 
     @Test
-    fun `lost service removes the pair`() {
+    fun `lost service is removed`() {
         val pairing = DiscoveryPairing()
-        pairing.onResolved("a", "192.168.1.10", 19400, true)
-        pairing.onResolved("a", "192.168.1.10", 19444, false)
-        pairing.onLost("a", isFlatbuf = true)
+        pairing.onResolved("a", "192.168.1.10", jsonPort = 8090, flatbufPort = 19400)
+        pairing.onLost("a")
+
         assertThat(pairing.servers()).isEmpty()
+    }
+
+    @Test
+    fun `re-resolve updates the record in place`() {
+        val pairing = DiscoveryPairing()
+        pairing.onResolved("a", "192.168.1.10", jsonPort = 8090, flatbufPort = 19400)
+        pairing.onResolved("a", "192.168.1.10", jsonPort = 9090, flatbufPort = 19400)
+
+        assertThat(pairing.servers()).containsExactly(
+            DiscoveredServer("a", "192.168.1.10", flatbufPort = 19400, jsonPort = 9090),
+        )
     }
 }
