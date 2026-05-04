@@ -128,10 +128,17 @@ class HyperHdrCaptureService : Service() {
             host = profile.host, port = profile.jsonPort,
         ).also { client ->
             scope.launch {
-                runCatching {
+                // Authorize + switch + probe capabilities up front. supportsP010
+                // gates the HDR_NATIVE tier below; absence (stock HyperHDR) means
+                // we must NOT send P010 frames or the server will drop them.
+                val supportsP010 = runCatching {
                     profile.token?.let { client.authorize(it) }
                     client.switchInstance(profile.instanceId)
+                    client.serverInfo().supportsP010
                 }.onFailure { sm.onError("JSON-API: ${it.message}") }
+                 .getOrDefault(false)
+
+                buildEncoderAndStart(profile, projection, supportsP010)
             }
         }
 
@@ -162,47 +169,6 @@ class HyperHdrCaptureService : Service() {
                 }
             }
         }
-
-        val dm = DisplayMetrics().also {
-            (getSystemService(WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(it)
-        }
-        // Tier selection: HDR_NATIVE only when (a) user opted in, (b) capability probe passed,
-        // (c) hdrAware is also on. Falls back to HDR_AWARE / SDR otherwise.
-        val tier = when {
-            profile.hdrNative && profile.hdrAware && Egl16BitCapabilityProbe.supportsR16UiFboStandalone() ->
-                CaptureTier.HDR_NATIVE
-            profile.hdrAware -> CaptureTier.HDR_AWARE
-            else -> CaptureTier.SDR
-        }
-        val baseSize = if (profile.highQuality) CaptureConfig.HIGH else CaptureConfig.STANDARD
-        val cfg = baseSize.copy(tier = tier)
-        encoder = try {
-            HyperHdrGpuEncoder(
-                mediaProjection = projection,
-                sourceWidth = dm.widthPixels,
-                sourceHeight = dm.heightPixels,
-                density = dm.densityDpi,
-                config = cfg,
-                sink = r,
-                onProjectionStopped = {
-                    scope.launch { sm.onProjectionPaused(); updateNotif() }
-                },
-            ).also { it.start() }
-        } catch (t: Throwable) {
-            sm.onError("GPU pipeline unavailable, using CPU fallback")
-            updateNotif()
-            null
-        }
-        if (encoder == null) {
-            cpuFallback = CpuRgbFallbackEncoder(
-                mediaProjection = projection,
-                sourceWidth = dm.widthPixels,
-                sourceHeight = dm.heightPixels,
-                density = dm.densityDpi,
-                config = cfg,
-                sink = r,
-            ).also { it.start() }
-        }
     }
 
     fun stopCapture() {
@@ -226,6 +192,55 @@ class HyperHdrCaptureService : Service() {
         hdrCollectorJob?.cancel(); hdrCollectorJob = null
         scope.cancel()
         super.onDestroy()
+    }
+
+    private fun buildEncoderAndStart(
+        profile: eu.hyperhdr.android.settings.ServerProfile,
+        projection: MediaProjection,
+        serverSupportsP010: Boolean,
+    ) {
+        val dm = DisplayMetrics().also {
+            (getSystemService(WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(it)
+        }
+        // Tier selection: HDR_NATIVE requires (a) user opted in, (b) device capability probe
+        // passed, (c) hdrAware is also on, AND (d) the HyperHDR server advertises P010 support
+        // via serverinfo.flatbuffer.imageFormats. Stock HyperHDR fails (d) and falls back.
+        val tier = when {
+            profile.hdrNative && profile.hdrAware && serverSupportsP010 &&
+                Egl16BitCapabilityProbe.supportsR16UiFboStandalone() ->
+                    CaptureTier.HDR_NATIVE
+            profile.hdrAware -> CaptureTier.HDR_AWARE
+            else -> CaptureTier.SDR
+        }
+        val baseSize = if (profile.highQuality) CaptureConfig.HIGH else CaptureConfig.STANDARD
+        val cfg = baseSize.copy(tier = tier)
+        encoder = try {
+            HyperHdrGpuEncoder(
+                mediaProjection = projection,
+                sourceWidth = dm.widthPixels,
+                sourceHeight = dm.heightPixels,
+                density = dm.densityDpi,
+                config = cfg,
+                sink = reconnector!!,
+                onProjectionStopped = {
+                    scope.launch { sm.onProjectionPaused(); updateNotif() }
+                },
+            ).also { it.start() }
+        } catch (t: Throwable) {
+            sm.onError("GPU pipeline unavailable, using CPU fallback")
+            updateNotif()
+            null
+        }
+        if (encoder == null) {
+            cpuFallback = CpuRgbFallbackEncoder(
+                mediaProjection = projection,
+                sourceWidth = dm.widthPixels,
+                sourceHeight = dm.heightPixels,
+                density = dm.densityDpi,
+                config = cfg,
+                sink = reconnector!!,
+            ).also { it.start() }
+        }
     }
 
     // --- helpers ---
