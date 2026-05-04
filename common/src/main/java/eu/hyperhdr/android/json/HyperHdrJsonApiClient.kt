@@ -54,7 +54,8 @@ class HyperHdrJsonApiClient(
                 ))
             }
         }
-        ServerInfo(version, instances, authRequired = false)
+        val (formats, wireVersion) = parseFlatbufferBlock(info)
+        ServerInfo(version, instances, authRequired = false, flatbufferFormats = formats, flatbufferWireVersion = wireVersion)
     }
 
     suspend fun authorize(token: String) = withContext(Dispatchers.IO) {
@@ -99,6 +100,16 @@ class HyperHdrJsonApiClient(
         if (!body.optBoolean("success", false)) {
             throw JsonApiError("videomode failed: ${body.optString("error","unknown")}", httpCode = 200)
         }
+    }
+
+    private fun parseFlatbufferBlock(info: JSONObject): Pair<Set<String>, Int?> {
+        val flatbuf = info.optJSONObject("flatbuffer") ?: return emptySet<String>() to null
+        val formatsArray = flatbuf.optJSONArray("imageFormats")
+        val formats = if (formatsArray != null) {
+            buildSet { for (i in 0 until formatsArray.length()) add(formatsArray.getString(i)) }
+        } else emptySet()
+        val wireVersion = if (flatbuf.has("wireVersion")) flatbuf.optInt("wireVersion") else null
+        return formats to wireVersion
     }
 
     private fun post(json: JSONObject): JSONObject {

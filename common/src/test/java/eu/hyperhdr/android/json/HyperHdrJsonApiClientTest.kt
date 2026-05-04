@@ -124,4 +124,54 @@ class HyperHdrJsonApiClientTest {
         assertThat(ex).isNotNull()
         assertThat(ex!!.message).contains("unknown command")
     }
+
+    @Test
+    fun `serverInfo treats missing flatbuffer block as stock - no P010 support`() = runTest {
+        server.enqueue(MockResponse().setBody("""
+            {"success":true,"command":"serverinfo","tan":1,
+             "info":{"hyperhdr_version":"21.0.0","instance":[]}}
+        """.trimIndent()))
+
+        val client = HyperHdrJsonApiClient(host = server.hostName, port = server.port)
+        val info = client.serverInfo()
+
+        assertThat(info.flatbufferFormats).isEmpty()
+        assertThat(info.flatbufferWireVersion).isNull()
+        assertThat(info.supportsP010).isFalse()
+    }
+
+    @Test
+    fun `serverInfo parses flatbuffer block from P010-capable fork`() = runTest {
+        server.enqueue(MockResponse().setBody("""
+            {"success":true,"command":"serverinfo","tan":1,
+             "info":{"hyperhdr_version":"22.0.0","instance":[],
+                     "flatbuffer":{
+                       "imageFormats":["RawImage","NV12Image","P010Image"],
+                       "wireVersion":2}}}
+        """.trimIndent()))
+
+        val client = HyperHdrJsonApiClient(host = server.hostName, port = server.port)
+        val info = client.serverInfo()
+
+        assertThat(info.flatbufferFormats)
+            .containsExactly("RawImage", "NV12Image", "P010Image")
+        assertThat(info.flatbufferWireVersion).isEqualTo(2)
+        assertThat(info.supportsP010).isTrue()
+    }
+
+    @Test
+    fun `serverInfo tolerates flatbuffer block without wireVersion`() = runTest {
+        server.enqueue(MockResponse().setBody("""
+            {"success":true,"command":"serverinfo","tan":1,
+             "info":{"hyperhdr_version":"22.0.0","instance":[],
+                     "flatbuffer":{"imageFormats":["RawImage","NV12Image"]}}}
+        """.trimIndent()))
+
+        val client = HyperHdrJsonApiClient(host = server.hostName, port = server.port)
+        val info = client.serverInfo()
+
+        assertThat(info.flatbufferFormats).containsExactly("RawImage", "NV12Image")
+        assertThat(info.flatbufferWireVersion).isNull()
+        assertThat(info.supportsP010).isFalse()
+    }
 }
