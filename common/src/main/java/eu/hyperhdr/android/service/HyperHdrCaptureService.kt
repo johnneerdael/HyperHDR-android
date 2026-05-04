@@ -25,6 +25,8 @@ import eu.hyperhdr.android.flatbuf.HyperHdrFlatBufferReconnector
 import eu.hyperhdr.android.json.HyperHdrJsonApiClient
 import eu.hyperhdr.android.settings.EncryptedProfileStorage
 import eu.hyperhdr.android.settings.ProfileStore
+import eu.hyperhdr.android.settings.ServerProfile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -131,14 +133,18 @@ class HyperHdrCaptureService : Service() {
                 // Authorize + switch + probe capabilities up front. supportsP010
                 // gates the HDR_NATIVE tier below; absence (stock HyperHDR) means
                 // we must NOT send P010 frames or the server will drop them.
-                val supportsP010 = runCatching {
+                val supportsP010 = try {
                     profile.token?.let { client.authorize(it) }
                     client.switchInstance(profile.instanceId)
                     client.serverInfo().supportsP010
-                }.onFailure { sm.onError("JSON-API: ${it.message}") }
-                 .getOrDefault(false)
+                } catch (ce: CancellationException) {
+                    throw ce
+                } catch (t: Throwable) {
+                    sm.onError("JSON-API: ${t.message}")
+                    false
+                }
 
-                buildEncoderAndStart(profile, projection, supportsP010)
+                buildEncoderAndStart(profile, projection, r, supportsP010)
             }
         }
 
@@ -195,16 +201,18 @@ class HyperHdrCaptureService : Service() {
     }
 
     private fun buildEncoderAndStart(
-        profile: eu.hyperhdr.android.settings.ServerProfile,
+        profile: ServerProfile,
         projection: MediaProjection,
+        sink: HyperHdrFlatBufferReconnector,
         serverSupportsP010: Boolean,
     ) {
         val dm = DisplayMetrics().also {
             (getSystemService(WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(it)
         }
         // Tier selection: HDR_NATIVE requires (a) user opted in, (b) device capability probe
-        // passed, (c) hdrAware is also on, AND (d) the HyperHDR server advertises P010 support
-        // via serverinfo.flatbuffer.imageFormats. Stock HyperHDR fails (d) and falls back.
+        // passed, (c) hdrAware is also on, AND (d) the HyperHDR server advertises P010 via
+        // serverinfo.info.flatbuffer.imageFormats (read by ServerInfo.supportsP010). Stock
+        // HyperHDR fails (d) and falls back.
         val tier = when {
             profile.hdrNative && profile.hdrAware && serverSupportsP010 &&
                 Egl16BitCapabilityProbe.supportsR16UiFboStandalone() ->
@@ -221,7 +229,7 @@ class HyperHdrCaptureService : Service() {
                 sourceHeight = dm.heightPixels,
                 density = dm.densityDpi,
                 config = cfg,
-                sink = reconnector!!,
+                sink = sink,
                 onProjectionStopped = {
                     scope.launch { sm.onProjectionPaused(); updateNotif() }
                 },
@@ -238,7 +246,7 @@ class HyperHdrCaptureService : Service() {
                 sourceHeight = dm.heightPixels,
                 density = dm.densityDpi,
                 config = cfg,
-                sink = reconnector!!,
+                sink = sink,
             ).also { it.start() }
         }
     }
